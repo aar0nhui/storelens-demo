@@ -1,0 +1,16 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+.DS_Store
+weights/
+demo_out/
+
+# Raw simulated overhead video and ground truth are big and regenerable (`storelens demo`). Never commit real footage.
+*.mp4
+*_gt.json.gz
+# ...except the small live-view clips the public demo needs
+!demo_data/live/*.mp4
+!site/media/*.mp4
+.wrangler/
+node_modules/

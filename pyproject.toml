@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "storelens"
+version = "0.1.0"
+description = "Privacy-first retail analytics on existing CCTV: footfall, display impressions, engagement, layout insights."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "opencv-python>=4.9",     # the Roboflow libs below depend on the non-headless wheel
+  "pydantic>=2.5",
+  "pyyaml>=6",
+  "supervision>=0.27",      # sv.Detections as the detector/tracker data carrier (MIT)
+  "trackers>=2.6,<3",       # ByteTrack implementation (Apache-2.0)
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+]
+
+[project.optional-dependencies]
+onnx = ["onnxruntime>=1.17"]          # YOLOX-ONNX detector backend (Apache-2.0 model + runtime)
+rfdetr = ["rfdetr"]                   # RF-DETR backend (Apache-2.0 for the base sizes); experimental here
+dev = ["pytest>=8", "httpx>=0.27", "playwright>=1.40"]
+
+[project.scripts]
+storelens = "storelens.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+storelens = ["web/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["slow: renders a short synthetic video and runs the full pipeline (~1 min)"]

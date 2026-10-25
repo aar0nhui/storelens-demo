@@ -1,0 +1,228 @@
+name: Demo Store (synthetic)
+floor:
+  width_m: 18.0
+  height_m: 12.0
+cameras:
+- id: cam1
+  anchor: center
+  pixel_points:
+  - - 55.051289150879775
+    - 42.039621310464945
+  - - 906.8370816178789
+    - 21.234539384818497
+  - - 934.5530457333404
+    - 599.2089237104499
+  - - 25.854589536357942
+    - 621.9159033414315
+  - - 258.85473950983516
+    - 440.9204677668969
+  - - 409.0052077774339
+    - 440.07935175976655
+  - - 36.48139717299878
+    - 418.8550583331362
+  - - 69.6206423431574
+    - 418.95130127342514
+  - - 191.75610938254562
+    - 231.21133850225877
+  - - 442.07286838571866
+    - 226.95909270707318
+  - - 757.8531083097319
+    - 459.6466495235276
+  - - 905.4650388049307
+    - 397.94450298227844
+  floor_points:
+  - - 0.0
+    - 0.0
+  - - 18.0
+    - 0.0
+  - - 18.0
+    - 12.0
+  - - 0.0
+    - 12.0
+  - - 4.5
+    - 8.6
+  - - 7.5
+    - 8.6
+  - - 0.0
+    - 8.0
+  - - 0.7
+    - 8.0
+  - - 3.0
+    - 4.2
+  - - 8.2
+    - 4.2
+  - - 14.6
+    - 9.2
+  - - 17.6
+    - 8.0
+  mask_polygons: []
+zones:
+- id: front_table
+  name: Front Table
+  kind: fixture
+  polygon:
+  - - 3.7
+    - 8.6
+  - - 8.3
+    - 8.6
+  - - 8.3
+    - 9.9
+  - - 3.7
+    - 9.9
+  target:
+  - 6.0
+  - 8.0
+  min_engage_s: null
+- id: wall_a
+  name: Wall Display A
+  kind: fixture
+  polygon:
+  - - 0.7
+    - 2.3
+  - - 2.0
+    - 2.3
+  - - 2.0
+    - 8.2
+  - - 0.7
+    - 8.2
+  target:
+  - 0.35
+  - 5.25
+  min_engage_s: null
+- id: gondola_c
+  name: Gondola C
+  kind: fixture
+  polygon:
+  - - 3.0
+    - 4.2
+  - - 8.2
+    - 4.2
+  - - 8.2
+    - 5.5
+  - - 3.0
+    - 5.5
+  target:
+  - 5.6
+  - 3.75
+  min_engage_s: null
+- id: endcap_b
+  name: Endcap B
+  kind: fixture
+  polygon:
+  - - 9.9
+    - 3.7
+  - - 14.1
+    - 3.7
+  - - 14.1
+    - 6.7
+  - - 9.9
+    - 6.7
+  target:
+  - 12.0
+  - 5.1
+  min_engage_s: null
+- id: back_promo
+  name: Back Promo
+  kind: fixture
+  polygon:
+  - - 5.0
+    - 0.8
+  - - 13.0
+    - 0.8
+  - - 13.0
+    - 2.2
+  - - 5.0
+    - 2.2
+  target:
+  - 9.0
+  - 0.4
+  min_engage_s: null
+- id: checkout
+  name: Checkout
+  kind: area
+  polygon:
+  - - 13.6
+    - 9.2
+  - - 17.9
+    - 9.2
+  - - 17.9
+    - 11.0
+  - - 13.6
+    - 11.0
+  target: null
+  min_engage_s: null
+- id: staff_area
+  name: Back of house
+  kind: staff
+  polygon:
+  - - 14.6
+    - 6.6
+  - - 17.9
+    - 6.6
+  - - 17.9
+    - 8.0
+  - - 14.6
+    - 8.0
+  target: null
+  min_engage_s: null
+entrance:
+  p1:
+  - 7.8
+  - 11.2
+  p2:
+  - 10.2
+  - 11.2
+  inside:
+  - 9.0
+  - 8.2
+  hysteresis_m: 0.25
+staff:
+  hsv_ranges:
+  - - - 0
+      - 120
+      - 80
+    - - 8
+      - 255
+      - 255
+  - - - 172
+      - 120
+      - 80
+    - - 179
+      - 255
+      - 255
+  min_fraction: 0.18
+  vote_ratio: 0.5
+  zone_time_fraction: 0.7
+thresholds:
+  process_fps: 10.0
+  smooth_window_s: 1.0
+  v_slow_mps: 0.35
+  v_move_mps: 0.45
+  facing_cone_deg: 60.0
+  min_engage_s: 2.0
+  engagement_mode: stop
+  min_zone_visit_s: 0.5
+  zone_gap_merge_s: 3.0
+  min_track_s: 1.5
+  static_max_disp_m: 0.3
+  static_min_duration_s: 90.0
+  lost_buffer_s: 2.0
+  stitch_window_s: 3.0
+  stitch_max_dist_m: 1.3
+  stitch_edge_margin_m: 0.9
+  track_activation: 0.35
+  high_conf: 0.5
+  min_consecutive: 3
+detector:
+  kind: bgsub
+  params: {}
+privacy:
+  blur: person
+  head_fraction: 0.35
+  margin: 0.25
+  persist_trajectories: false
+  id_rotation_hours: 24
+output:
+  bucket_minutes: 5
+  heat_cell_m: 0.5
+  timezone: America/Los_Angeles

@@ -1,0 +1,10 @@
+// Cloudflare Workers static assets: serve the prebuilt ./site folder (see docs/deploy-static-demo.md).
+// Not needed if you deploy with Cloudflare Pages instead (set "build output directory" to `site` there).
+{
+  "name": "storelens-demo",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./site",
+    "not_found_handling": "404-page"
+  }
+}
