@@ -9,9 +9,11 @@ import numpy as np
 import supervision as sv
 
 from .analysis import FacingEstimator, MotionFacing, analyze_samples, is_engaged
+from .attributes import AttributeEstimator, AudienceCounter, NullEstimator
+from .cameras import CameraNetwork
 from .config import StoreConfig
 from .detect import Detector, make_detector
-from .geometry import Homography, points_in_polygon, project_zones_to_pixels
+from .geometry import Homography, project_zones_to_pixels
 from .privacy import Anonymizer, PreviewWriter, obscure, privacy_regions
 from .staff import StaffClassifier
 from .store import EventStore
@@ -21,25 +23,34 @@ from .track import TrackManager, Tracklet
 class Pipeline:
     def __init__(self, cfg: StoreConfig, store: EventStore, camera_id: str | None = None,
                  detector: Detector | None = None, estimator: FacingEstimator | None = None,
-                 label: str = "run", anonymizer: Anonymizer | None = None):
+                 label: str = "run", anonymizer: Anonymizer | None = None,
+                 attributes: AttributeEstimator | None = None):
         self.cfg = cfg
         self.cam = cfg.camera(camera_id)
         self.store = store
         self.label = label
         self.H = Homography.from_camera(self.cam)
-        self.detector = detector or make_detector(cfg.detector, mask_polygons=self.cam.mask_polygons)
+        det_cfg = cfg.detector.model_copy(update={"params": {**cfg.detector.params, **self.cam.detector_params}})
+        self.detector = detector or make_detector(det_cfg, mask_polygons=self.cam.mask_polygons)
         self.estimator = estimator or MotionFacing()
         self.staff = StaffClassifier(cfg.staff)
         self.anon = anonymizer or Anonymizer(cfg.privacy.id_rotation_hours)
+        # Audience estimates (age band / perceived gender) are opt-in and aggregate-only: see attributes.py.
+        self.attr = attributes if (attributes is not None and cfg.demographics.enabled) else NullEstimator()
+        # With several cameras every spot on the floor has one owner: this camera only tracks what it owns (cameras.py).
+        self.net = CameraNetwork(cfg) if cfg.multi_camera else None
+        self.counts_visitors = self.cam.role in ("entrance", "both")
         self._reset_counters()
 
     def _reset_counters(self) -> None:
+        self.audience = AudienceCounter(self.cfg) if not isinstance(self.attr, NullEstimator) else None
         self.n = {"customers": 0, "staff": 0, "dropped_short": 0, "dropped_static": 0, "entries": 0,
                   "exits": 0, "zone_visits": 0, "engaged": 0}
         self.run_id = -1
 
     # ------------------------------------------------------------------------------------ commit
     def _on_commit(self, tl: Tracklet) -> None:
+        est = self.attr.finalize(tl.uid)  # always pop the in-memory state first, whatever happens to the tracklet
         a = analyze_samples(tl.t, tl.xy, self.cfg, estimator=self.estimator)
         if a.dropped == "short":
             self.n["dropped_short"] += 1
@@ -57,13 +68,23 @@ class Pipeline:
         self.n["customers"] += 1
         self.store.add_visit(self.run_id, key, "customer", a.t_first, a.t_last)
         self.store.add_zone_visits(self.run_id, key, a.zone_visits)
-        self.store.add_entries(self.run_id, key, a.entries)
+        self.store.add_entries(self.run_id, key, a.entries if self.cam.role != "floor" else [])
         self.store.add_heat(self.run_id, a.heat)
         self.n["zone_visits"] += len(a.zone_visits)
         mode = self.cfg.thresholds.engagement_mode
         self.n["engaged"] += sum(
             is_engaged(z.stopped_s, z.facing_stopped_s, self.cfg.engage_seconds(self.cfg.zone(z.zone_id)), mode)
             for z in a.zone_visits if self.cfg.zone(z.zone_id).kind == "fixture")
+        if self.audience is not None:
+            per_zone: dict[str, list[bool]] = {}  # zone -> [impression, engaged]
+            for z in a.zone_visits:
+                zc = self.cfg.zone(z.zone_id)
+                if zc.kind == "staff":
+                    continue
+                flags = per_zone.setdefault(z.zone_id, [True, False])
+                if zc.kind == "fixture" and is_engaged(z.stopped_s, z.facing_stopped_s, self.cfg.engage_seconds(zc), mode):
+                    flags[1] = True
+            self.audience.add(est, a.t_first, self.counts_visitors, [(zid, f[0], f[1]) for zid, f in per_zone.items()])
         self.n["entries"] += sum(1 for _, d in a.entries if d > 0)
         self.n["exits"] += sum(1 for _, d in a.entries if d < 0)
 
@@ -94,6 +115,7 @@ class Pipeline:
         t0 = time.time()
         last_t = start_ts
         mask_polys = [np.asarray(p, np.int32) for p in self.cam.mask_polygons]
+        privacy_polys = [np.asarray(p, np.int32) for p in self.cam.privacy_mask_polygons]
         idx = -1
         while True:
             ok, frame = cap.read()
@@ -106,15 +128,23 @@ class Pipeline:
                 break
             t = start_ts + idx / vfps
             last_t = t
+            if privacy_polys:  # restrooms, fitting-room doors: blanked BEFORE detection, so nothing there is ever seen
+                cv2.fillPoly(frame, privacy_polys, (0, 0, 0))
             dets = self.detector.detect(frame)
             dets = self._apply_masks(dets, mask_polys)
             anchors = self._anchors(dets.xyxy)
             floor = self.H.to_floor(anchors) if len(anchors) else np.zeros((0, 2))
+            if self.net is not None and len(dets):  # keep only what this camera owns: no double counting across cameras
+                keep = self.net.accepts(self.cam.id, floor)
+                dets, floor = dets[keep], floor[keep]
             votes = np.array([self.staff.vote(frame, b) for b in dets.xyxy], dtype=bool) \
                 if len(dets) else np.zeros(0, bool)
             confirmed = tm.update(t, dets, floor, votes)
             frames += 1
             det_total += len(dets)
+            if not isinstance(self.attr, NullEstimator):  # in-memory votes per live track; see attributes.py
+                for (uid, fxy, _), box in zip(tm.last, tm.last_boxes):
+                    self.attr.observe(uid, idx, t, frame, box, fxy)
             if frame_hook is not None:  # live views: (t, [(track uid, floor xy, staff vote), ...]); in memory only
                 frame_hook(t, tm.last)
 
@@ -129,6 +159,14 @@ class Pipeline:
         tm.flush()
         if pv:
             pv.close()
+        demo_meta = {"enabled": bool(self.audience is not None)}
+        if self.audience is not None:
+            self.store.add_audience(self.run_id, self.audience.counts)
+            demo_meta.update({"estimator": self.attr.name, "simulated": bool(self.attr.simulated),
+                              "min_cell": self.cfg.demographics.min_cell,
+                              "bucket_hours": self.cfg.demographics.bucket_hours,
+                              "engagement_mode": self.cfg.thresholds.engagement_mode, **self.audience.stats})
+            self.attr_pending = self.attr.pending()  # must be 0: nothing per-person survives the run
 
         elapsed = time.time() - t0
         meta = {
@@ -140,10 +178,14 @@ class Pipeline:
             "dropped_short": self.n["dropped_short"], "dropped_static": self.n["dropped_static"],
             "entries": self.n["entries"], "exits": self.n["exits"],
             "calibration_rmse_cm": round(self.H.reprojection_rmse_cm(), 1),
+            "layout_version": self.cfg.layout_version, "demographics": demo_meta,
+            "camera_role": self.cam.role, "multi_camera": self.cfg.multi_camera,
             "camera_anchor": self.cam.anchor, "facing_estimator": type(self.estimator).__name__,
             "privacy": {"blur": self.cfg.privacy.blur, "trajectories_persisted": False,
                         "raw_frames_persisted": 0, "id_rotation_hours": self.cfg.privacy.id_rotation_hours,
-                        "appearance_reid": False},
+                        "appearance_reid": False,
+                        "demographics": "aggregate_counts_only" if self.audience is not None else "off",
+                        "per_person_attributes_persisted": False},
         }
         self.store.finish_run(self.run_id, last_t, meta)
         meta["run_id"] = self.run_id

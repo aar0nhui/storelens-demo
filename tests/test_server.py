@@ -83,7 +83,7 @@ def test_dashboard_layout_sidebar_navigation_and_sections(client):
         assert needle in html, needle
     assert re.search(r'id="brand" href="#/overview"', html)  # logo + name go back to Overview
     tabs = re.findall(r'data-tab="(\w+)"', html)
-    assert tabs == ["overview", "floor", "activity", "insights", "data"]
+    assert tabs == ["overview", "floor", "activity", "audience", "recommend", "insights", "data"]
     assert re.search(r"const TABS = \[([^\]]*)\]", js).group(1).replace("'", "").replace(" ", "").split(",") == tabs
     for t in tabs:
         assert f'id="pane-{t}"' in html and f'href="#/{t}"' in html and f'id="nav-{t}"' in html

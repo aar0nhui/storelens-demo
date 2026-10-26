@@ -1,7 +1,7 @@
 /* StoreLens dashboard: dependency-free. Works against the live API or an embedded snapshot (static report / site).
  *
  * Layout: a collapsible sidebar that jumps between sections, and one section at a time in the main column:
- *   Overview (key numbers + live view) · Floor plan · Activity · Insights · Data & privacy.
+ *   Overview (key numbers + live view) · Floor plan · Activity · Audience · Recommendations · Insights · Data & privacy.
  * Sections are routed with the URL hash (#/overview ...) and rendered lazily when first shown, because a canvas / SVG
  * can only be measured while it is visible. */
 (function () {
@@ -31,6 +31,7 @@
 
   async function api(path) {
     if (SNAP) {
+      if (SNAP.__empty__) throw new Error('No data has arrived yet. It appears here after the store computer pushes its first snapshot.');
       if (!(path in SNAP)) throw new Error('This static report only contains the default views (' + path + ').');
       return SNAP[path];
     }
@@ -49,16 +50,22 @@
   const secs = (x) => (x === null || x === undefined ? '–' : x >= 60 ? Math.floor(x / 60) + 'm ' + Math.round(x % 60) + 's' : Math.round(x) + 's');
   const KIND_COLOR = () => ({ fixture: css('--accent'), area: css('--teal'), staff: css('--violet') });
 
-  const TABS = ['overview', 'floor', 'activity', 'insights', 'data'];
-  const state = { cfg: null, runs: [], sel: 'all', mode: 'traffic', zone: null, d: {}, tab: 'overview', dirty: new Set(TABS), seriesErr: null };
+  const TABS = ['overview', 'floor', 'activity', 'audience', 'recommend', 'insights', 'data'];
+  const state = { cfg: null, runs: [], sel: 'all', mode: 'traffic', zone: null, d: {}, tab: 'overview', dirty: new Set(TABS), seriesErr: null, assume: null };
   const views = [];  // floor-plan canvases (just the one on the Floor plan section)
-  const TITLES = { overview: 'Overview', floor: 'Floor plan', activity: 'Activity', insights: 'Insights', data: 'Data & privacy' };
+  const TITLES = { overview: 'Overview', floor: 'Floor plan', activity: 'Activity', audience: 'Audience', recommend: 'Recommendations', insights: 'Insights', data: 'Data & privacy' };
   const ui = { closeDrawer: () => {} };
 
   const suffix = () => (state.sel === 'all' ? '' : '?runs=' + state.sel);
   const sep = () => (state.sel === 'all' ? '?' : '&');
   const tsPath = () => '/api/timeseries' + suffix() + (state.zone ? sep() + 'zone=' + state.zone : '');
   const runLabel = (r) => (r.label || 'run ' + r.run_id) + ' · ' + r.start_iso.slice(0, 16).replace('T', ' ');
+  function groupSessions(runs) {
+    const m = new Map();
+    runs.forEach((r) => { const k = (r.label || '') + '@' + Math.round(r.t_start); if (!m.has(k)) m.set(k, { run: r, ids: [] }); m.get(k).ids.push(r.run_id); });
+    return [...m.values()];
+  }
+  const sessLabel = (x) => runLabel(x.run);
   
   // ------------------------------------------------------------------------------------ sidebar
   const mqMobile = window.matchMedia('(max-width: 860px)');
@@ -105,7 +112,7 @@
 
   // ------------------------------------------------------------------------------------ sections / routing
   const tabFromHash = () => { const m = /^#\/([a-z]+)/.exec(location.hash); return m && TABS.includes(m[1]) ? m[1] : 'overview'; };
-  const R = { overview: renderKPIs, floor: renderFloorTab, activity: renderActivity, insights: renderInsightsTab, data: renderData };
+  const R = { overview: renderKPIs, floor: renderFloorTab, activity: renderActivity, audience: renderAudience, recommend: renderRecommend, insights: renderInsightsTab, data: renderData };
   const markDirty = () => TABS.forEach((t) => state.dirty.add(t));
   function paint(t) {  // render a tab if its data changed since it was last drawn
     if (!state.d.summary || !state.dirty.has(t)) return;
@@ -179,22 +186,25 @@
   async function init() {
     setupSidebar();
     try {
-      [state.cfg, state.runs] = await Promise.all([api('/api/config'), api('/api/runs')]);
+      [state.cfg, state.runs, state.cams] = await Promise.all([api('/api/config'), api('/api/runs'), api('/api/cameras').catch(() => null)]);
     } catch (e) { $('#panes').prepend(h('div', { class: 'empty' }, 'Could not load data: ' + e.message)); return; }
     $('#storeName').textContent = state.cfg.name;
     const demo = window.__STORELENS_DEMO__;  // set by `storelens site`: "simulated data" label + optional call-to-action link
     if (demo && demo.label) { const chip = $('#demoChip'); chip.textContent = demo.label; chip.hidden = false; }
     if (demo && /^(https?:|mailto:)/i.test(demo.ctaUrl || '')) { const a = $('#ctaLink'); a.href = demo.ctaUrl; a.textContent = demo.ctaText || 'Request a pilot'; a.hidden = false; }
+    // One entry per recording session: with several cameras a session is several runs (one per camera) analysed together.
+    const sess = groupSessions(state.runs);
+    state.sessions = sess;
     const period = $('#period');
-    period.append(h('option', { value: 'all' }, 'All runs (' + state.runs.length + ')'));
-    state.runs.forEach((r) => period.append(h('option', { value: String(r.run_id) }, runLabel(r))));
-    state.sel = state.runs.length ? String(state.runs[state.runs.length - 1].run_id) : 'all';
+    period.append(h('option', { value: 'all' }, 'All periods (' + sess.length + ')'));
+    sess.forEach((x) => period.append(h('option', { value: x.ids.join(',') }, sessLabel(x))));
+    state.sel = sess.length ? sess[sess.length - 1].ids.join(',') : 'all';
     period.value = state.sel;
     period.addEventListener('change', () => { state.sel = period.value; state.zone = null; load(); });
 
     const a = $('#cmpA'), b = $('#cmpB');
-    state.runs.forEach((r) => { a.append(h('option', { value: r.run_id }, runLabel(r))); b.append(h('option', { value: r.run_id }, runLabel(r))); });
-    if (state.runs.length >= 2) { a.value = state.runs[0].run_id; b.value = state.runs[1].run_id; }
+    sess.forEach((x) => { a.append(h('option', { value: x.ids.join(',') }, sessLabel(x))); b.append(h('option', { value: x.ids.join(',') }, sessLabel(x))); });
+    if (sess.length >= 2) { a.value = sess[0].ids.join(','); b.value = sess[1].ids.join(','); }
     a.addEventListener('change', renderCompare); b.addEventListener('change', renderCompare);
 
     const zs = $('#seriesZone');
@@ -218,10 +228,13 @@
   async function load() {
     const sfx = suffix();
     try {
-      const [summary, zones, heat, ts, flows, insights, quality] = await Promise.all([
+      const soft = (p) => api(p).catch(() => null);  // older snapshots do not have these views: the tabs then say so
+      const [summary, zones, heat, ts, flows, insights, quality, audience, recs] = await Promise.all([
         api('/api/summary' + sfx), api('/api/zones' + sfx), api('/api/heatmap' + sfx), api(tsPath()),
-        api('/api/flows' + sfx), api('/api/insights' + sfx), api('/api/quality' + sfx)]);
-      state.d = { summary, zones, heat, ts, flows, insights, quality }; state.seriesErr = null;
+        api('/api/flows' + sfx), api('/api/insights' + sfx), api('/api/quality' + sfx),
+        soft('/api/audience' + sfx), soft('/api/recommendations' + sfx)]);
+      state.d = { summary, zones, heat, ts, flows, insights, quality, audience, recs }; state.seriesErr = null;
+      state.assume = null;  // re-seeded from the new selection's assumptions
     } catch (e) { showError(e.message); return; }
     showError(''); markDirty(); paint(state.tab);
   }
@@ -239,7 +252,7 @@
   async function pickZone(id, { toggle = true } = {}) { await setZone(toggle && state.zone === id ? null : id); paint(state.tab); }
 
   // ------------------------------------------------------------------------------------ tab renderers
-  function renderFloorTab() { views.forEach(drawFloor); renderZoneDetail(); renderZones(); }
+  function renderFloorTab() { views.forEach(drawFloor); renderZoneDetail(); renderZones(); renderCameras(); }
   function renderActivity() { $('#seriesZone').value = state.zone || ''; renderSeries(); renderFlows(); }
   function renderInsightsTab() { renderInsights(); renderCompare(); }
   function renderData() { renderQuality(); }
@@ -402,6 +415,38 @@
     $('#zoneTable').replaceChildren(wrap);
   }
 
+  // ------------------------------------------------------------------------------------ cameras & coverage
+  function renderCameras() {
+    const c = state.cams, card = $('#camCard');
+    card.hidden = !c;
+    if (!c) return;
+    const cov = c.coverage, cfg = state.cfg, cols = [css('--accent'), css('--teal'), css('--violet'), css('--warn')];
+    $('#camSub').textContent = `${c.cameras.length} camera${c.cameras.length > 1 ? 's' : ''} · floor plan version ${c.layout_version} · ${pct(cov.covered_fraction)} of the floor seen` + (c.multi_camera ? ` · ${pct(cov.overlap_fraction)} seen by more than one` : '');
+    const W = Math.max(260, Math.min(520, $('#camMap').clientWidth || 440)), H = Math.round(W * cfg.floor.height_m / cfg.floor.width_m), sx = W / cov.nx, sy = H / cov.ny;
+    const svg = s('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Which camera owns which part of the floor' });
+    svg.append(s('rect', { x: 0, y: 0, width: W, height: H, fill: css('--floor') }));
+    cov.owner_grid.forEach((row, j) => { let i = 0; while (i < row.length) { let k = i; while (k < row.length && row[k] === row[i]) k++;
+      svg.append(s('rect', { x: i * sx, y: j * sy, width: (k - i) * sx + 0.5, height: sy + 0.5, fill: row[i] < 0 ? css('--bad-soft') : cols[row[i] % cols.length], 'fill-opacity': row[i] < 0 ? 1 : 0.28 })); i = k; } });
+    const fx = W / cfg.floor.width_m, fy = H / cfg.floor.height_m;
+    cfg.zones.forEach((z) => {
+      const d = z.polygon.map(([x, y], i) => (i ? 'L' : 'M') + (x * fx).toFixed(1) + ' ' + (y * fy).toFixed(1)).join(' ') + ' Z';
+      const cx = z.polygon.reduce((a, p) => a + p[0], 0) / z.polygon.length * fx, cy = z.polygon.reduce((a, p) => a + p[1], 0) / z.polygon.length * fy;
+      svg.append(s('path', { d, fill: 'none', stroke: css('--ink'), 'stroke-opacity': 0.55, 'stroke-width': 1.2 }), s('text', { x: cx, y: cy + 4, 'text-anchor': 'middle', style: 'font-size:10.5px' }, z.name + (c.multi_camera && cov.zone_owner[z.id] ? ' [' + cov.zone_owner[z.id] + ']' : '')));
+    });
+    c.cameras.forEach((cam, i) => { if (!cam.pose) return;
+      svg.append(s('circle', { cx: cam.pose.x * fx, cy: cam.pose.y * fy, r: 6, fill: cols[i % cols.length], stroke: css('--ink'), 'stroke-width': 1 }), s('text', { x: cam.pose.x * fx + 9, y: cam.pose.y * fy - 7, style: 'font-size:11px;font-weight:650' }, cam.name)); });
+    $('#camMap').replaceChildren(svg);
+    const cal = (k) => ({ good: ['good', 'good'], fair: ['fair', 'warn'], poor: ['poor', 'bad'] }[k] || [k, '']);
+    $('#camList').replaceChildren(h('table', { class: 'runs' }, h('thead', {}, h('tr', {}, ['Camera', 'Role', 'Calibration', 'Error'].map((x) => h('th', {}, x)))),
+      h('tbody', {}, c.cameras.map((cam, i) => { const q = cam.calibration, st = cal(q.status);
+        return h('tr', {}, h('td', {}, h('span', { class: 'dot', style: 'background:' + cols[i % cols.length] }), ' ' + cam.name), h('td', {}, cam.role),
+          h('td', {}, h('span', { class: 'pill ' + st[1], style: 'margin-top:0' }, st[0])),
+          h('td', { title: q.loo_rmse_cm === null ? 'Only 4 points: the error is exact by construction' : 'Reprojection error / leave-one-out error' }, q.rmse_cm.toFixed(1) + ' cm' + (q.loo_rmse_cm !== null ? ' / ' + q.loo_rmse_cm.toFixed(1) : ''))); }))),
+      h('p', { class: 'sub', style: 'margin:10px 0 0' }, 'Tint = the camera that owns that part of the floor: it alone counts people there, so overlapping cameras never count someone twice. Pink = not seen by any camera.'));
+    const warns = [].concat(cov.warnings || [], ...c.cameras.map((cam) => (cam.calibration.warnings || []).map((w) => cam.name + ': ' + w)));
+    $('#camWarn').replaceChildren(...warns.map((w) => h('li', {}, w)));
+  }
+
   // ------------------------------------------------------------------------------------ series
   function renderSeries() {
     const ts = (state.d && state.d.ts) || [], box = $('#series');
@@ -459,12 +504,14 @@
   // ------------------------------------------------------------------------------------ compare
   async function renderCompare() {
     const a = $('#cmpA').value, b = $('#cmpB').value, box = $('#compare');
-    if (state.runs.length < 2) { box.replaceChildren(h('div', { class: 'empty' }, 'Run the pipeline on a second period (after a layout change) to compare before/after.')); return; }
+    if ((state.sessions || state.runs).length < 2) { box.replaceChildren(h('div', { class: 'empty' }, 'Run the pipeline on a second period (after a layout change) to compare before/after.')); return; }
     if (a === b) { box.replaceChildren(h('div', { class: 'empty' }, 'Pick two different runs.')); return; }
     let cmp, ins;
     try { [cmp, ins] = await Promise.all([api(`/api/compare?a=${a}&b=${b}`), api(`/api/insights?a=${a}&b=${b}`)]); }
     catch (e) { box.replaceChildren(h('div', { class: 'empty' }, e.message)); return; }
     if (cmp.error) { box.replaceChildren(h('div', { class: 'empty' }, cmp.error)); return; }
+    const lvNote = cmp.layout_versions ? h('div', { class: 'ins warning', style: 'margin-bottom:10px' }, h('h3', {}, 'The floor plan changed between these periods'),
+      h('p', {}, 'Layout versions ' + cmp.layout_versions.join(' and ') + '. A change in a display can come from where it stands now, not only from what you did to it; displays you did not touch are the yardstick for store-wide shifts.')) : null;
     const rows = cmp.zones.map((r) => ({ r, m: r.adjusted || r }));
     const lo = Math.min(-100, ...rows.map((x) => x.m.ci_low_pct ?? -100)), hi = Math.min(400, Math.max(100, ...rows.map((x) => x.m.ci_high_pct ?? 100)));
     const whisk = (x) => {
@@ -485,15 +532,180 @@
       h('tbody', {}, rows.map((x) => h('tr', {}, h('td', {}, x.r.name), h('td', {}, num(x.r.a.per_100, 1)), h('td', {}, num(x.r.b.per_100, 1)),
         h('td', {}, fmt(x.r.lift_pct)), h('td', {}, x.r.adjusted ? fmt(x.r.adjusted.lift_pct) : '–'), h('td', {}, whisk(x)), h('td', {}, chip(x.m.verdict))))));
     const results = ins.filter((c) => c.kind === 'result');
-    box.replaceChildren(
+    box.replaceChildren(...[lvNote,
       h('div', { class: 'sub', style: 'margin-bottom:8px' }, `Engaged visitors per 100 store visitors · ${cmp.visitors.a} visitors before, ${cmp.visitors.b} after · verdict uses the adjusted lift when available · intervals widened for comparing ${cmp.n_compared || cmp.zones.length} displays`),
-      table, results.length ? h('div', { class: 'insights', style: 'margin-top:14px' }, results.map(insightCard)) : h('div', { class: 'sub', style: 'margin-top:12px' }, 'No display shows a statistically clear change at 95% confidence. A small store needs several hundred visitors per period to detect modest changes.'));
+      table, results.length ? h('div', { class: 'insights', style: 'margin-top:14px' }, results.map(insightCard)) : h('div', { class: 'sub', style: 'margin-top:12px' }, 'No display shows a statistically clear change at 95% confidence. A small store needs several hundred visitors per period to detect modest changes.')].filter(Boolean));
+  }
+
+  // ------------------------------------------------------------------------------------ audience
+  const SEG_LABEL = { female: 'Female-presenting', male: 'Male-presenting' };
+  const segName = (l) => SEG_LABEL[l] || l;
+  const VERDICT = { over: ['over-represented', 'good'], under: ['under-represented', 'warn'], 'in line': ['in line', ''], 'n/a': ['too few to say', ''] };
+  const xfmt = (v) => (v === null || v === undefined ? '–' : v.toFixed(1) + '×');
+
+  function shareBars(rows, labelOf) {  // horizontal bars with a 95% interval whisker
+    const W = Math.max(260, ($('#audAge').clientWidth || 360)), rowH = 30, lw = 124, rw = 150, H = rows.length * rowH + 4;
+    const top = Math.max(0.05, ...rows.map((r) => r.ci[1])), sx = (v) => lw + (W - lw - rw) * Math.min(v, top) / top;
+    const svg = s('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Share of visitors by group' });
+    rows.forEach((r, i) => {
+      const y = i * rowH + 4, cy = y + 11;
+      svg.append(s('text', { x: 0, y: cy + 4 }, labelOf(r)),
+        s('rect', { x: lw, y: y + 3, width: Math.max(2, sx(r.share) - lw), height: 16, rx: 3, fill: css('--accent') }),
+        s('line', { x1: sx(r.ci[0]), x2: sx(r.ci[1]), y1: cy, y2: cy, stroke: css('--ink'), 'stroke-width': 1.4 }),
+        s('line', { x1: sx(r.ci[0]), x2: sx(r.ci[0]), y1: cy - 4, y2: cy + 4, stroke: css('--ink'), 'stroke-width': 1.4 }),
+        s('line', { x1: sx(r.ci[1]), x2: sx(r.ci[1]), y1: cy - 4, y2: cy + 4, stroke: css('--ink'), 'stroke-width': 1.4 }),
+        s('text', { x: W - rw + 8, y: cy + 4 }, `${pct(r.share)}  (${pct(r.ci[0])}–${pct(r.ci[1])}) · n=${r.n}`));
+    });
+    return svg;
+  }
+  function renderAudience() {
+    const a = state.d.audience, off = $('#audOff'), body = $('#audBody');
+    const say = (msg) => { off.hidden = false; body.hidden = true; off.replaceChildren(h('div', { class: 'empty' }, msg)); };
+    if (!a) return say('This view is not in the data file. Rebuild the site with a current version of StoreLens.');
+    if (!a.enabled) return say('Audience estimates are switched off for this store (demographics.enabled: false). They are opt-in because they need a legal review first: see Data & privacy.');
+    if (!a.has_data) return say('No audience counts in this selection yet.');
+    off.hidden = true; body.hidden = false;
+    const c = a.coverage, st = a.store;
+    $('#audCoverage').textContent = `${num(c.visitors_counted)} visitors counted · age estimated for ${pct(c.age_known_share)} · gender for ${pct(c.gender_known_share)} · groups under ${a.min_cell} people are merged or hidden`;
+    $('#audAge').replaceChildren(st.by_age.length ? shareBars(st.by_age, (r) => r.label) : h('div', { class: 'empty' }, 'Too few people with a known age to show a split.'));
+    $('#audGender').replaceChildren(st.by_gender ? shareBars(st.by_gender, (r) => segName(r.label)) : h('div', { class: 'empty' }, 'One of the two groups is below the minimum size, so no split is shown.'));
+    const mx = st.matrix;
+    $('#audMatrix').replaceChildren(mx ? h('table', { class: 'runs aud-matrix' }, h('thead', {}, h('tr', {}, h('th', {}, 'Age / gender'), mx.cols.map((x) => h('th', {}, segName(x))))),
+      h('tbody', {}, mx.rows.map((row, i) => h('tr', {}, h('td', {}, row), mx.n[i].map((n, j) => h('td', {}, pct(mx.share[i][j]) + ' · ' + n)))))) : h('div', { class: 'sub', style: 'margin-top:10px' }, 'Age × gender table hidden: at least one cell is under ' + a.min_cell + ' people.'));
+    $('#audNotes').replaceChildren(...a.notes.map((n) => h('li', {}, n)));
+
+    const hl = a.highlights.filter((x) => x.verdict === 'over' || x.verdict === 'under');
+    $('#audHighlights').replaceChildren(...(hl.length ? hl.slice(0, 6).map((x) => h('div', { class: 'ins ' + (x.verdict === 'over' ? 'opportunity' : 'warning') },
+      h('h3', {}, `${x.zone}: ${segName(x.group)} ${x.verdict === 'over' ? 'over' : 'under'}-represented (${xfmt(x.index)})`),
+      h('p', {}, `${segName(x.group)} are ${x.verdict === 'over' ? 'more' : 'less'} common among the people engaging with ${x.zone} than among all visitors. Index ${xfmt(x.index)}, 95% interval ${xfmt(x.ci[0])}–${xfmt(x.ci[1])}, ${x.n} people.`),
+      h('span', { class: 'pill' }, 'estimate'))) : [h('div', { class: 'empty' }, 'No group stands out clearly yet. Intervals are wide until a display has a few dozen engaged people per group.')]));
+
+    $('#audZones').replaceChildren(...a.zones.map((z) => {
+      const rows = (grp) => (grp || []).map((g) => {
+        const top = 1, v = VERDICT[g.verdict] || VERDICT['n/a'];
+        return h('div', { class: 'arow', title: g.ci ? `index ${xfmt(g.index)} (95% interval ${xfmt(g.ci[0])}–${xfmt(g.ci[1])}) · ${g.n} people` : '' },
+          h('span', { class: 'al' }, segName(g.label)),
+          h('span', { class: 'atrack' }, h('i', { class: 'abar', style: `width:${Math.round(100 * Math.min(g.share, top))}%` }), g.visitor_share !== null ? h('i', { class: 'amark', style: `left:${Math.round(100 * Math.min(g.visitor_share, top))}%` }) : null),
+          h('span', { class: 'av' }, pct(g.share)), h('span', { class: 'ax' }, xfmt(g.index)), h('span', { class: 'pill ' + v[1] }, v[0]));
+      });
+      const have = z.age || z.gender;
+      return h('div', { class: 'acard' }, h('div', { class: 'acard-h' }, h('b', {}, z.name), h('span', { class: 'sub' }, `${num(z.n)} ${z.base === 'engaged' ? 'engaged' : 'visits'} · ${z.confidence} confidence`)),
+        have ? h('div', {}, rows(z.age), z.age && z.gender ? h('div', { class: 'asep' }) : null, rows(z.gender)) : h('div', { class: 'sub' }, 'Too few people for a split without going below the minimum group size.'));
+    }));
+  }
+
+  // ------------------------------------------------------------------------------------ recommendations
+  const money = (x) => { const cur = (state.d.recs && state.d.recs.assumptions.currency) || 'USD';
+    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(x); } catch (e) { return Math.round(x).toLocaleString(); } };
+  const rng = (r, f) => { const a = f(r[0]), b = f(r[1]); return a === b ? a : a + ' – ' + b; };
+  const n1 = (x) => num(x, x < 10 ? 1 : 0);
+  function calc(eff) {  // per-visitor deltas x the (editable) visitors per day and money assumptions
+    const A = state.assume, eng = eff.engaged_per_visitor.map((x) => x * A.V);
+    const rev = [eng[0] * A.prLo * A.value, eng[1] * A.prHi * A.value];
+    return { eng, pass: eff.passers_per_visitor ? eff.passers_per_visitor.map((x) => x * A.V) : null, rev, month: rev.map((x) => x * 30) };
+  }
+  function renderAssumptions() {
+    const A = state.assume, box = $('#assumeForm');
+    const field = (label, key, step, suffix, hint) => h('label', { class: 'af' }, h('span', {}, label),
+      h('span', { class: 'af-in' }, h('input', { type: 'number', min: '0', step, value: String(key === 'prLo' || key === 'prHi' ? +(A[key] * 100).toFixed(1) : +A[key].toFixed(2)),
+        'aria-label': label, onchange: (e) => { const v = parseFloat(e.target.value); if (isFinite(v) && v >= 0) { A[key] = key === 'prLo' || key === 'prHi' ? v / 100 : v; if (A.prLo > A.prHi) { if (key === 'prLo') A.prHi = A.prLo; else A.prLo = A.prHi; } renderRecommendBody(); renderAssumptions(); } } }), suffix),
+      h('span', { class: 'sub' }, hint));
+    box.replaceChildren(field('Visitors per day', 'V', '10', '', state.d.recs.assumptions.visitors_per_day_source),
+      field('Average spend per buyer', 'value', '1', state.d.recs.assumptions.currency, 'of one engaged shopper who buys'),
+      field('Engaged shoppers who buy: low', 'prLo', '0.5', '%', 'cautious case'),
+      field('Engaged shoppers who buy: high', 'prHi', '0.5', '%', 'optimistic case'),
+      h('button', { class: 'btn', type: 'button', onclick: () => { state.assume = null; renderRecommend(); } }, 'Reset'));
+  }
+  function floorMap(moves) {
+    const cfg = state.cfg, W = Math.max(280, $('#recMap').clientWidth || 520), H = Math.round(W * cfg.floor.height_m / cfg.floor.width_m);
+    const sx = W / cfg.floor.width_m, sy = H / cfg.floor.height_m, kc = KIND_COLOR();
+    const svg = s('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Floor plan with suggested moves' });
+    svg.append(s('rect', { x: 0.5, y: 0.5, width: W - 1, height: H - 1, rx: 8, fill: css('--floor'), stroke: css('--line') }));
+    const path = (poly) => poly.map(([x, y], i) => (i ? 'L' : 'M') + (x * sx).toFixed(1) + ' ' + (y * sy).toFixed(1)).join(' ') + ' Z';
+    const cen = (poly) => [poly.reduce((a, p) => a + p[0], 0) / poly.length * sx, poly.reduce((a, p) => a + p[1], 0) / poly.length * sy];
+    const moved = new Set(moves.map((m) => m.zone_id));
+    cfg.zones.forEach((z) => {
+      const c = cen(z.polygon);
+      svg.append(s('path', { d: path(z.polygon), fill: 'none', stroke: kc[z.kind], 'stroke-width': moved.has(z.id) ? 1 : 1.4, 'stroke-dasharray': z.kind === 'staff' || moved.has(z.id) ? '4 3' : '0', opacity: moved.has(z.id) ? 0.6 : 1 }),
+        s('text', { x: c[0], y: c[1] + 4, 'text-anchor': 'middle', style: 'font-size:11px' }, z.name));
+    });
+    const e = cfg.entrance;
+    svg.append(s('line', { x1: e.p1[0] * sx, x2: e.p2[0] * sx, y1: e.p1[1] * sy, y2: e.p2[1] * sy, stroke: css('--bad'), 'stroke-width': 4 }));
+    svg.append(s('defs', {}, s('marker', { id: 'arr', viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, s('path', { d: 'M0 0L10 5L0 10z', fill: css('--accent') }))));
+    moves.forEach((m) => {
+      const a = cen(m.from), b = cen(m.to), name = (cfg.zones.find((z) => z.id === m.zone_id) || {}).name || m.zone_id;
+      svg.append(s('path', { d: path(m.to), fill: css('--accent'), 'fill-opacity': 0.16, stroke: css('--accent'), 'stroke-width': 2 }),
+        s('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: css('--accent'), 'stroke-width': 2, 'marker-end': 'url(#arr)' }),
+        s('text', { x: b[0], y: b[1] - 4, 'text-anchor': 'middle', style: 'font-size:11px;font-weight:650;fill:' + css('--accent') }, name + ' →'));
+    });
+    return svg;
+  }
+  function recCard(r) {
+    const e = calc(r.effect);
+    const stat2 = (l, v) => h('div', { class: 'es' }, h('div', { class: 'l' }, l), h('div', { class: 'v' }, v));
+    return h('article', { class: 'rec' }, h('div', { class: 'rec-h' }, h('h3', {}, r.title), h('span', { class: 'pill ' + (CONF[r.confidence] || '') }, r.confidence + ' confidence')),
+      h('p', { class: 'why' }, r.why), h('p', { class: 'scn' }, h('b', {}, 'Scenario: '), r.scenario + '.'),
+      h('div', { class: 'eff' }, e.pass && r.type === 'increase_reach' ? stat2('More people reaching it / day', '+' + rng(e.pass, n1)) : null,
+        stat2('More engaged shoppers / day', '+' + rng(e.eng, n1)), stat2('Estimated sales / day', rng(e.rev, money)), stat2('Per 30 days', rng(e.month, money))),
+      h('ul', { class: 'acts' }, r.actions.map((x) => h('li', {}, x))));
+  }
+  function mktCard(m) {
+    const A = state.assume, base = state.d.recs.assumptions, f = A.V / base.visitors_per_day;
+    const rows = m.scenarios.map((sc) => {
+      const eng = sc.extra_engaged_all_per_day * f, rev = [eng * A.prLo * A.value, eng * A.prHi * A.value];
+      return h('tr', {}, h('td', {}, '+' + sc.uplift_pct + '%'), h('td', {}, '+' + n1(sc.extra_visitors_per_day * f)), h('td', {}, '+' + n1(sc.extra_engaged_here_per_day * f)),
+        h('td', {}, '+' + n1(eng)), h('td', {}, rng(rev, money)));
+    });
+    return h('article', { class: 'rec' }, h('div', { class: 'rec-h' }, h('h3', {}, m.title), h('span', { class: 'pill ' + (CONF[m.confidence] || '') }, m.confidence + ' confidence')),
+      h('p', { class: 'why' }, m.why), h('ul', { class: 'acts' }, m.actions.map((x) => h('li', {}, x))),
+      h('table', { class: 'runs sens' }, h('thead', {}, h('tr', {}, ['If visits from them rise', 'Extra visitors / day', 'Engaged here / day', 'Engaged anywhere / day', 'Sales / day'].map((x) => h('th', {}, x)))), h('tbody', {}, rows)),
+      h('p', { class: 'sub', style: 'margin:8px 0 0' }, m.note));
+  }
+  function renderRecommendBody() {
+    const r = state.d.recs;
+    const lay = r.recommendations.filter((x) => x.lever === 'layout' && x.zone_id);
+    const seen = new Set(), pick = [];
+    lay.forEach((x) => { if (!seen.has(x.zone_id)) { seen.add(x.zone_id); pick.push(x); } });
+    const hero = $('#recHero');
+    if (pick.length) {
+      const tot = pick.map((x) => calc(x.effect)), sum = (k, i) => tot.reduce((a, t) => a + t[k][i], 0);
+      hero.hidden = false;
+      hero.replaceChildren(h('div', { class: 'hero' }, h('div', {}, h('div', { class: 'l' }, 'If all the layout changes below reach their targets'),
+        h('div', { class: 'big' }, '+' + rng([sum('eng', 0), sum('eng', 1)], n1) + ' engaged shoppers a day'),
+        h('div', { class: 'sub' }, 'about ' + rng([sum('rev', 0), sum('rev', 1)], money) + ' a day, ' + rng([sum('month', 0), sum('month', 1)], money) + ' per 30 days, on the assumptions above')),
+        h('div', { class: 'sub hero-n' }, 'Sum of one scenario per display, assuming they do not affect each other. Treat it as the size of the prize, not a forecast.')));
+    } else hero.hidden = true;
+    const moves = r.layout_plan.moves;
+    $('#recMapWrap').hidden = !moves.length;
+    if (moves.length) {
+      $('#recMapSub').textContent = 'dashed = where it is now · filled = a busier spot of the same size, if the fixture can move';
+      $('#recMap').replaceChildren(floorMap(moves));
+      $('#recPlan').replaceChildren(...r.recommendations.filter((x) => x.zone_id).map((x, i) => h('li', {}, h('b', {}, x.zone + ': '), x.title.split(': ').slice(1).join(': ') || x.title, h('span', { class: 'sub' }, ' · ' + rng(calc(x.effect).rev, money) + ' / day'))));
+    }
+    $('#recList').replaceChildren(...(r.recommendations.length ? r.recommendations.map(recCard) : [h('div', { class: 'empty' }, (r.warnings[0] || 'No display stands out from the others yet: nothing to recommend with confidence.'))]));
+    $('#recMkt').replaceChildren(...(r.marketing.length ? r.marketing.map(mktCard) : [h('div', { class: 'empty' }, state.d.audience && state.d.audience.enabled ? 'No group is clearly over-represented at a display yet.' : 'Needs audience estimates (switched off for this store).')]));
+  }
+  function renderRecommend() {
+    const r = state.d.recs;
+    if (!r) { $('#recList').replaceChildren(h('div', { class: 'empty' }, 'This view is not in the data file. Rebuild the site with a current version of StoreLens.')); return; }
+    if (!state.assume && r.assumptions.visitors_per_day) {
+      const a = r.assumptions; state.assume = { V: a.visitors_per_day, value: a.avg_item_value, prLo: a.purchase_rate[0], prHi: a.purchase_rate[1] };
+    }
+    $('#recAssume').hidden = !state.assume;
+    if (!state.assume) { $('#recHero').hidden = true; $('#recMapWrap').hidden = true; $('#recList').replaceChildren(h('div', { class: 'empty' }, r.warnings[0] || 'Not enough data.')); $('#recMkt').replaceChildren(); return; }
+    renderAssumptions();
+    renderRecommendBody();
+    const cav = (r.caveats || []).concat(r.warnings || []);
+    $('#recCaveats').replaceChildren(...cav.map((x) => h('li', {}, x)));
   }
 
   // ------------------------------------------------------------------------------------ quality
   function renderQuality() {
     const q = state.d.quality, p = q.privacy, box = $('#quality');
-    const priv = [`${p.raw_frames_stored} raw frames stored · ${p.faces_stored} faces stored`, 'No trajectories stored: only per-display events and aggregate heat grids',
+    const aud = p.demographics === 'aggregate_counts_only'
+      ? ['Audience estimates (age band, perceived gender) are made in memory and counted in aggregate: no face image, crop or per-person label is stored, and the counts cannot be joined to a visit']
+      : ['Audience estimates (age band, gender) are switched off'];
+    const priv = [`${p.raw_frames_stored} raw frames stored · ${p.faces_stored} face images stored`, ...aud, 'No trajectories stored: only per-display events and aggregate heat grids',
       'No appearance re-identification: tracks cannot be linked across visits or days', `Visit IDs are salted hashes that rotate every ${p.id_rotation_hours} h (the salt is never written to disk)`,
       `Preview video is obscured (${p.blur_mode === 'person' ? 'whole person' : p.blur_mode} mosaic) before it is written`];
     const runs = h('table', { class: 'runs' }, h('thead', {}, h('tr', {}, ['Run', 'Frames', 'Detector', 'Speed', 'Customers', 'Staff', 'Stitched', 'Calib. error'].map((x) => h('th', {}, x)))),

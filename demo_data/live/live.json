@@ -1,22 +1,22 @@
 {
  "camera": "camera.mp4",
  "floorplan": "floorplan.mp4",
- "seconds": 60.0,
+ "seconds": 60,
  "fps": 20,
  "simulated": true,
  "start": "2026-11-02T10:00:00",
  "clip_start_offset_s": 55.0,
  "counts_at_end": {
-  "in_store": 8,
-  "visitors": 25,
-  "impressions": 56,
-  "engaged": 12
+  "in_store": 5,
+  "visitors": 19,
+  "impressions": 42,
+  "engaged": 15
  },
  "pipeline": {
   "detector": "bgsub",
-  "customers": 26,
-  "staff": 10,
-  "elapsed_s": 42.8
+  "customers": 19,
+  "staff": 5,
+  "elapsed_s": 38.2
  },
  "note": "Both views are rendered from the same simulation. The pipeline analyses the overhead camera; the perspective feed is for people to watch. Heads are mosaicked; tags are anonymous track ids."
 }

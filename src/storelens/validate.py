@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import math
 from pathlib import Path
 
 import numpy as np
@@ -78,7 +79,99 @@ def _pct_err(pred: float, truth: float) -> float:
     return (pred - truth) / truth * 100.0 if truth else float("nan")
 
 
-def validate(cfg: StoreConfig, store: EventStore, run_id: int, gt: dict) -> dict:
+COARSE_AGE = {"<13": "<25", "13-24": "<25", "25-44": "25-44", "45-64": "45+", "65+": "45+"}
+COARSE_ORDER = ["<25", "25-44", "45+"]
+
+
+def audience_check(cfg: StoreConfig, store: EventStore, run_id: int, gt: dict, ev: list[dict],
+                   estimator=None, min_engaged: int = 15) -> dict:
+    """How close are the audience numbers to the simulator's truth? (The attribute model itself is simulated, so this
+    tests the aggregation, the privacy-preserving counting and the affinity statistics, not a real model's accuracy.)"""
+    from scipy.stats import spearmanr
+    attrs = {p["id"]: (COARSE_AGE.get(p.get("age_band", ""), None), p.get("gender") or None)
+             for p in gt["people"] if p["role"] == "customer"}
+    vis_t: dict[tuple, int] = {}
+    eng_t: dict[str, dict[tuple, int]] = {}
+    for p in ev:
+        if p["role"] != "customer" or p["a"].dropped is not None or p["id"] not in attrs:
+            continue
+        age, g = attrs[p["id"]]
+        if age is None:
+            continue
+        for key in (("age", age), ("gender", g)):
+            vis_t[key] = vis_t.get(key, 0) + 1
+        seen = set()
+        for z in p["a"].zone_visits:
+            zc = cfg.zone(z.zone_id)
+            if zc.kind == "fixture" and z.stopped_s >= cfg.engage_seconds(zc) and z.zone_id not in seen:
+                seen.add(z.zone_id)
+                for key in (("age", age), ("gender", g)):
+                    eng_t.setdefault(z.zone_id, {})[key] = eng_t.get(z.zone_id, {}).get(key, 0) + 1
+    vis_e: dict[tuple, int] = {}
+    eng_e: dict[str, dict[tuple, int]] = {}
+    unk = {"age": 0, "gender": 0, "n": 0}
+    for zone, metric, a, g, n in store.query(
+            "SELECT zone_id,metric,age_band,gender,SUM(n) FROM audience WHERE run_id=? GROUP BY 1,2,3,4", (run_id,)):
+        if metric == "visitor":
+            unk["n"] += n
+            unk["age"] += n if a == "unknown" else 0
+            unk["gender"] += n if g == "unknown" else 0
+        if metric not in ("visitor", "engaged"):
+            continue
+        tgt = vis_e if metric == "visitor" else eng_e.setdefault(zone, {})
+        if a != "unknown":
+            k = ("age", COARSE_AGE.get(a, a))
+            tgt[k] = tgt.get(k, 0) + n
+        if g != "unknown":
+            k = ("gender", g)
+            tgt[k] = tgt.get(k, 0) + n
+
+    def shares(d, dim, keys):
+        tot = sum(d.get((dim, k), 0) for k in keys)
+        return {k: d.get((dim, k), 0) / tot if tot else float("nan") for k in keys}
+
+    sa_t, sa_e = shares(vis_t, "age", COARSE_ORDER), shares(vis_e, "age", COARSE_ORDER)
+    sg_t, sg_e = shares(vis_t, "gender", ["female", "male"]), shares(vis_e, "gender", ["female", "male"])
+    tvd = 0.5 * sum(abs(sa_t[k] - sa_e[k]) for k in COARSE_ORDER)
+    pairs = []
+    for zid, cell in eng_t.items():
+        if sum(v for (dim, _), v in cell.items() if dim == "age") < min_engaged:
+            continue
+        for dim, keys in (("age", COARSE_ORDER), ("gender", ["female", "male"])):
+            vt, ve = shares(vis_t, dim, keys), shares(vis_e, dim, keys)
+            et, ee = shares(cell, dim, keys), shares(eng_e.get(zid, {}), dim, keys)
+            for k in keys:
+                if vt[k] > 0 and ve[k] > 0 and et[k] == et[k] and ee[k] == ee[k]:
+                    pairs.append((zid, dim, k, et[k] / vt[k], ee[k] / ve[k]))
+    out = {"visitors_counted": unk["n"], "unknown_age_share": unk["age"] / unk["n"] if unk["n"] else None,
+           "unknown_gender_share": unk["gender"] / unk["n"] if unk["n"] else None,
+           "age_share_true": sa_t, "age_share_estimated": sa_e, "age_tvd": tvd,
+           "female_share_true": sg_t["female"], "female_share_estimated": sg_e["female"],
+           "affinity_pairs": len(pairs)}
+    if len(pairs) >= 4:
+        tr, es = np.array([p[3] for p in pairs]), np.array([p[4] for p in pairs])
+        out["affinity_spearman"] = float(spearmanr(tr, es).statistic)
+        out["affinity_mae"] = float(np.mean(np.abs(tr - es)))
+        out["affinity_direction_agree"] = float(np.mean((tr > 1) == (es > 1)))
+        strong = [(a, b) for a, b in zip(tr, es) if abs(math.log(a)) > math.log(1.3)]
+        out["affinity_strong_pairs"] = len(strong)
+        out["affinity_strong_direction_agree"] = float(np.mean([(a > 1) == (b > 1) for a, b in strong])) if strong else None
+    if estimator is not None and getattr(estimator, "audit_log", None):
+        log = estimator.audit_log
+        order = {b: i for i, b in enumerate(cfg.demographics.age_bands)}
+        known_a = [r for r in log if r["age"] != "unknown"]
+        known_g = [r for r in log if r["gender"] != "unknown"]
+        out["estimator"] = {
+            "tracks": len(log),
+            "age_exact": float(np.mean([r["age"] == r["true_age"] for r in known_a])) if known_a else None,
+            "age_within_one_band": float(np.mean([abs(order[r["age"]] - order[r["true_age"]]) <= 1 for r in known_a]))
+            if known_a else None,
+            "gender_correct": float(np.mean([r["gender"] == r["true_gender"] for r in known_g])) if known_g else None,
+            "age_unknown": 1 - len(known_a) / len(log), "gender_unknown": 1 - len(known_g) / len(log)}
+    return out
+
+
+def validate(cfg: StoreConfig, store: EventStore, run_id: int, gt: dict, estimator=None) -> dict:
     row = store.query("SELECT t_start, meta FROM runs WHERE run_id=?", (run_id,))[0]
     t_start, meta = float(row[0]), json.loads(row[1] or "{}")
     ev = gt_events(gt, cfg, t_start)
@@ -180,7 +273,10 @@ def validate(cfg: StoreConfig, store: EventStore, run_id: int, gt: dict) -> dict
     corr = float(np.corrcoef(gt_heat.ravel(), pr_heat.ravel())[0, 1]) if gt_heat.std() and pr_heat.std() else float("nan")
 
     n_gt_cust = sum(1 for p in ev if p["role"] == "customer" and p["a"].dropped is None)
+    audience = audience_check(cfg, store, run_id, gt, ev, estimator) \
+        if cfg.demographics.enabled and meta.get("demographics", {}).get("enabled") else None
     return {
+        "audience": audience,
         "run_id": run_id,
         "footfall": footfall,
         "zones": zones,
@@ -267,4 +363,19 @@ def format_report(r: dict, title: str = "") -> str:
     h = r["heatmap"]
     L.append(f"Heatmap: Pearson r {_f(h['pearson_r'])}  occupancy ratio (pipeline/GT) {_f(h['occupancy_ratio_pipeline_over_gt'])}")
     L.append(f"Calibration reprojection RMSE: {r['calibration_rmse_cm']} cm")
+    a = r.get("audience")
+    if a:
+        L.append("")
+        L.append(f"Audience (simulated attribute model): {a['visitors_counted']} visitors counted, unknown age "
+                 f"{_f(a['unknown_age_share'], nd=2)} / gender {_f(a['unknown_gender_share'], nd=2)}; "
+                 f"age-mix TVD {_f(a['age_tvd'])}; female share true {_f(a['female_share_true'])} vs est "
+                 f"{_f(a['female_share_estimated'])}")
+        if "affinity_spearman" in a:
+            L.append(f"  display affinity vs truth: Spearman {_f(a['affinity_spearman'])}  MAE {_f(a['affinity_mae'])}  "
+                     f"direction agrees on {_f(a['affinity_direction_agree'] * 100, True)} "
+                     f"of {a['affinity_pairs']} pairs")
+        e = a.get("estimator")
+        if e:
+            L.append(f"  estimator vs truth over {e['tracks']} tracks: age exact {_f(e['age_exact'])}  within one band "
+                     f"{_f(e['age_within_one_band'])}  gender {_f(e['gender_correct'])}")
     return "\n".join(L)

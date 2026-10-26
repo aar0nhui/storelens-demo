@@ -96,9 +96,13 @@ def test_site_works_in_a_browser_under_a_sub_path_with_its_csp(client, chromium,
         page.wait_for_selector("#kpis .kpi")
         assert page.inner_text("#demoChip") == "Demo · simulated data"
         assert page.get_attribute("#ctaLink", "href") == "mailto:team@example.org" and page.is_visible("#ctaLink")
-        for t in ("floor", "activity", "insights", "data"):
+        for t in ("floor", "activity", "audience", "recommend", "insights", "data"):
             page.click(f"#nav-{t}")
             page.wait_for_function(f"location.hash === '#/{t}'")
+            page.wait_for_timeout(400)
+            text = page.inner_text("main") if page.query_selector("main") else page.inner_text("body")
+            for bad in ("null", "undefined", "NaN", "[object"):  # a child that was null/undefined once rendered as text
+                assert bad not in text, f"'{bad}' is showing on the {t} tab"
         page.goto(base + "/some/sub/path/#/floor")
         page.wait_for_selector("#zoneTable tr.zrow")
     finally:

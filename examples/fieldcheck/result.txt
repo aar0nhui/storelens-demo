@@ -1,0 +1,11 @@
+=== Field check (gates fe4ab6e55be6, layout 1, runs [1, 2], empty-store runs [3]) ===
+[UNCERTAIN   ] door_count: 36 windows, manual 977 vs pipeline 959: bias -1.8% [-3.2, -0.5], window error 3.5% (95% CI up to 4.5%); about 24 windows would pin the bias to ±2 points
+[PASS        ] crowd_counts: 1-3 people: n=107, -1.8% (undercounts); 4-8 people: n=177, -2.5% (undercounts); 9+ people: n=53, -3.8% (undercounts)
+                level 1-3   n=107  bias -1.8% [-3.9, +0.4]  undercounts  -> PASS
+                level 4-8   n=177  bias -2.5% [-4.2, -0.8]  undercounts  -> PASS
+                level 9+    n=53   bias -3.8% [-5.5, -2.0]  undercounts  -> PASS
+[PASS        ] zone_stops: 1069 labelled stops: found 1046 (98%, CI 97%-99%), attributed to the wrong display 2 (0.2%), missed 21; precision 0.94 (63 pipeline stops nobody labelled)
+[INSUFFICIENT] empty_store: 0.2 h of empty store: 0 tracks, 0 zone visits, 0 door entries (0.00/h, 95% upper bound 14.76/h) - zero events needs about 12 h to show <0.25/h
+[PASS        ] audience_mix: labelled 1034 people vs 1088 stored visitors: age-mix TVD 0.02, female share 0.57 labelled vs 0.57 system
+
+OVERALL: UNCERTAIN   (Labels are only as good as the annotators: have a second person label a subset and report their agreement. Judge on held-out days chosen BEFORE seeing the results.)

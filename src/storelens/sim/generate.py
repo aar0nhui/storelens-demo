@@ -4,7 +4,6 @@ from __future__ import annotations
 import copy
 import gzip
 import json
-import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,6 +14,7 @@ import numpy as np
 from ..config import dump_config
 from .layout import CAM_SIZE, Layout, build_store_config, default_layout
 from .render import Renderer
+from .segments import Segment, sample_segment, segment_fixtures
 from .world import (Goal, NavGrid, Person, arrival_times, execute_goals, plan_customer, staff_counter,
                     staff_roamer)
 
@@ -33,6 +33,7 @@ class Period:
     seed: int = 1
     base_per_min: float = 5.0
     group_prob: float = 0.15
+    staff: bool = True  # False = an empty store (nobody at all): used by the empty-store false-alarm test
     # fixture_id -> {param: value}, e.g. {"endcap_b": {"p_browse": 0.40}}
     overrides: dict = field(default_factory=dict)
 
@@ -51,6 +52,7 @@ def build_people(layout: Layout, period: Period, fps: int) -> list[Person]:
     dt = 1.0 / fps
     n_frames = int(period.minutes * 60 * fps)
     nav = NavGrid(layout)
+    seg_fixtures = segment_fixtures(layout.fixtures)  # per-segment display preferences (see sim/segments.py)
     people: list[Person] = []
     pid = 0
     gid = 0
@@ -61,14 +63,18 @@ def build_people(layout: Layout, period: Period, fps: int) -> list[Person]:
         return PALETTE[int(rng.integers(len(PALETTE)))]
 
     for t_arr in arrival_times(rng, period.minutes * 60 - 100, period.base_per_min):
-        goals = plan_customer(rng, layout, layout.fixtures)
+        lead = sample_segment(rng)  # group leaders are teens/adults; children come along as the second member
+        goals = plan_customer(rng, layout, seg_fixtures[lead.key])
         gid += 1
         size = 2 if rng.random() < period.group_prob else 1
         for k in range(size):
             if k == 0:
                 g = goals
                 off = (0.0, 0.0)
+                seg = lead
             else:
+                seg = (Segment("<13", str(rng.choice(["female", "male"]))) if rng.random() < 0.25
+                       else sample_segment(rng))
                 g = []
                 for goal in goals:
                     if goal.kind == "browse" and rng.random() > 0.6:
@@ -81,8 +87,10 @@ def build_people(layout: Layout, period: Period, fps: int) -> list[Person]:
             x, y, h, script = execute_goals(rng, nav, layout, g, start * dt, dt, offset=off)
             m = n_frames - start
             people.append(Person(pid, "customer", gid, start, x[:m], y[:m], h[:m], clothing(),
-                                 HAIR[int(rng.integers(len(HAIR)))], script))
+                                 HAIR[int(rng.integers(len(HAIR)))], script, seg.age_band, seg.gender))
             pid += 1
+    if not period.staff:
+        return people
     # staff
     x, y, h = staff_counter(rng, layout, n_frames, dt)
     people.append(Person(pid, "staff", -1, 0, x[:n_frames], y[:n_frames], h[:n_frames], STAFF_VEST,
@@ -100,7 +108,7 @@ def write_ground_truth(path: Path, people: list[Person], fps: int, n_frames: int
         "people": [{
             "id": p.pid, "role": p.role, "group": p.group, "start_frame": p.start_frame,
             "x": np.round(p.x, 3).tolist(), "y": np.round(p.y, 3).tolist(), "h": np.round(p.h, 3).tolist(),
-            "script": p.script,
+            "script": p.script, "age_band": p.age_band, "gender": p.gender,
         } for p in people],
     }
     with gzip.open(path, "wt", encoding="utf-8") as fh:
@@ -137,6 +145,13 @@ def generate_period(layout: Layout, period: Period, out_dir: Path, fps: int = 10
     writer.release()
     write_ground_truth(gt, people, fps, n_frames, period)
     return video, gt, people
+
+
+def generate_empty(out_dir: str | Path, minutes: float = 20.0, seed: int = 5, fps: int = 10, verbose: bool = True):
+    """A clip of the store with nobody in it (no customers, no staff): every detection is a false alarm."""
+    layout = default_layout()
+    return generate_period(layout, Period("empty_store", minutes=minutes, seed=seed, base_per_min=0.0, staff=False),
+                           Path(out_dir), fps=fps, verbose=verbose)
 
 
 def default_periods(minutes: float = 30.0, seed: int = 11) -> list[Period]:

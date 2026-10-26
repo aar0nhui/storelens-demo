@@ -21,15 +21,42 @@ class FloorPlan(BaseModel):
     height_m: float = Field(gt=0)
 
 
+class CameraPose(BaseModel):
+    """Where the camera hangs, for the floor-plan drawing and sanity checks. The calibration points, not this,
+    define the geometry the analytics use."""
+    x: float
+    y: float
+    height_m: float = 3.0
+    heading_deg: float = 0.0  # direction the camera looks, degrees clockwise from +x (floor coordinates, y down)
+    fov_deg: float = 90.0
+
+
 class CameraConfig(BaseModel):
     id: str
+    name: str | None = None
+    # entrance: counts door crossings and defines "visitors" (one per person entering) when there are several cameras
+    # floor:    measures its zones (impressions, dwell, engagement) but does not define visitor totals
+    # both:     a single camera that does everything (the default, and the only sensible choice with one camera)
+    role: Literal["entrance", "floor", "both"] = "both"
     # "center" for ceiling/overhead cameras (the blob centre is the person's floor position).
     # "bottom_center" for oblique cameras (the feet are the floor contact point).
     anchor: Literal["center", "bottom_center"] = "center"
     pixel_points: list[Point]
     floor_points: list[Point]
-    # Pixel regions to ignore (mirrors, TV screens, posters of people).
+    # Pixel regions to ignore (mirrors, TV screens, posters of people): detections anchored there are dropped.
     mask_polygons: list[list[Point]] = Field(default_factory=list)
+    # Pixel regions blanked BEFORE detection (restrooms, fitting-room doors, staff-only rooms): the detector never
+    # sees them, so nothing there can be tracked, counted or analysed.
+    privacy_mask_polygons: list[list[Point]] = Field(default_factory=list)
+    image_size: tuple[int, int] | None = None  # (width, height) in pixels of the analysed stream
+    pose: CameraPose | None = None
+    # Floor polygon (metres) where this camera's measurements are trusted; None = everything it can see.
+    valid_region: list[Point] | None = None
+    # Zone ids this camera is responsible for. None = chosen automatically (best view of the zone).
+    owns: list[str] | None = None
+    # Per-camera detector tuning, merged over ``detector.params``. Pixel sizes differ between cameras, so e.g. the
+    # background-subtraction detector's ``typical_area`` must too: ``storelens cameras`` prints a suggestion.
+    detector_params: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _check_points(self) -> "CameraConfig":
@@ -62,6 +89,7 @@ class EntranceConfig(BaseModel):
     p2: Point
     inside: Point  # any floor point on the *inside* of the store; defines the entry direction
     hysteresis_m: float = 0.25
+    camera: str | None = None  # id of the camera that sees the door (None = the first camera)
 
 
 class StaffConfig(BaseModel):
@@ -119,8 +147,42 @@ class OutputConfig(BaseModel):
     timezone: str = "America/Los_Angeles"
 
 
+class DemographicsConfig(BaseModel):
+    """Optional audience estimates (age band, perceived gender). OFF by default.
+
+    When on, a face-region model runs on the edge box, IN MEMORY, once per tracked person; the result is added to an
+    aggregate counter and the person's state is dropped. Nothing per-person is stored: the ``audience`` table has
+    no visit key, only counts per (time bucket, display, age band, perceived gender). See docs/privacy-and-legal.md.
+    """
+    enabled: bool = False
+    age_bands: list[str] = Field(default_factory=lambda: ["<13", "13-24", "25-44", "45-64", "65+"])
+    min_cell: int = Field(default=10, ge=2)  # groups smaller than this are never shown (merged or hidden)
+    bucket_hours: int = Field(default=6, ge=1, le=24)  # time resolution of the stored counts (coarse on purpose)
+
+
+class BusinessConfig(BaseModel):
+    """Assumptions behind the what-if estimates in Recommendations. They are INPUTS, not measurements: replace them
+    with the store's own numbers (POS data) as soon as they are available."""
+    currency: str = "USD"
+    open_hours_per_day: float = Field(default=10.0, gt=0)
+    avg_item_value: float = Field(default=28.0, ge=0)  # average value of what a shopper buys after stopping at a display
+    # low / high share of engaged shoppers who buy something because of the display (illustrative defaults)
+    purchase_rate_given_engaged: tuple[float, float] = (0.05, 0.15)
+    visitors_per_day: float | None = None  # None = measured visitors per hour x open_hours_per_day
+
+    @model_validator(mode="after")
+    def _rates(self) -> "BusinessConfig":
+        lo, hi = self.purchase_rate_given_engaged
+        if not (0 <= lo <= hi <= 1):
+            raise ValueError("purchase_rate_given_engaged must be (low, high) with 0 <= low <= high <= 1")
+        return self
+
+
 class StoreConfig(BaseModel):
     name: str = "Demo Store"
+    # The floor plan changes when the store is rearranged. Bump this then: metrics are tagged with it, so a before/after
+    # comparison across two layout versions is flagged instead of silently mixing layouts.
+    layout_version: str = "1"
     floor: FloorPlan
     cameras: list[CameraConfig]
     zones: list[ZoneConfig]
@@ -130,13 +192,34 @@ class StoreConfig(BaseModel):
     detector: DetectorConfig = Field(default_factory=DetectorConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
+    demographics: DemographicsConfig = Field(default_factory=DemographicsConfig)
+    business: BusinessConfig = Field(default_factory=BusinessConfig)
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "StoreConfig":
         ids = [z.id for z in self.zones]
         if len(ids) != len(set(ids)):
             raise ValueError("zone ids must be unique")
+        cams = [c.id for c in self.cameras]
+        if len(cams) != len(set(cams)):
+            raise ValueError("camera ids must be unique")
+        if not cams:
+            raise ValueError("at least one camera is required")
+        known, owned = set(ids), {}
+        for c in self.cameras:
+            for zid in c.owns or []:
+                if zid not in known:
+                    raise ValueError(f"camera {c.id} owns unknown zone {zid!r}")
+                if zid in owned:
+                    raise ValueError(f"zone {zid!r} is owned by both {owned[zid]} and {c.id}: one owner per zone")
+                owned[zid] = c.id
+        if self.entrance.camera is not None and self.entrance.camera not in cams:
+            raise ValueError(f"entrance.camera {self.entrance.camera!r} is not a configured camera")
         return self
+
+    @property
+    def multi_camera(self) -> bool:
+        return len(self.cameras) > 1
 
     def zone(self, zone_id: str) -> ZoneConfig:
         for z in self.zones:

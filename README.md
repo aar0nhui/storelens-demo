@@ -1,9 +1,10 @@
 # StoreLens
 
 Privacy-first marketing analytics that runs on a store's **existing CCTV**. It counts anonymous people over time,
-shows which displays they come near and stop at, for how long, and tells the owner which layout changes worked.
-It never remembers a person: no faces, no appearance embeddings, no stored trajectories, and every preview is blurred
-before it is written.
+shows which displays they come near and stop at, for how long, tells the owner which layout changes worked, and suggests
+what to change next with a clearly-labelled estimate of what it could be worth. It never remembers a person: no stored
+faces, no appearance embeddings, no stored trajectories, and every preview is blurred before it is written. An optional,
+off-by-default **audience mode** estimates age band and perceived gender in memory and keeps only aggregate counts.
 
 This repository is the **MVP**: a complete, runnable pipeline plus a dashboard, validated on a synthetic store
 simulator that provides ground truth. It has **not** been run on real store footage yet. See
@@ -30,7 +31,8 @@ storelens demo --out demo --minutes 20 --preview
 #      (add --minutes 90 for a comparison with enough visitors to be conclusive; --no-live skips step 4)
 
 storelens serve --config demo/store.yaml --db demo/demo.db     # live dashboard at http://127.0.0.1:8000
-pytest                                                          # ~1 min; `pytest -m "not slow"` skips the video test
+pytest                                                          # ~6 min; `pytest -m "not slow"` skips the video tests (~1 min)
+(cd cloud && npm ci && npm test)                                # private-app Worker tests (Node 20+)
 ```
 
 Individual steps:
@@ -41,6 +43,10 @@ Individual steps:
 | `storelens calibrate --config store.yaml --video v.mp4` | draw the zones over a real frame to eyeball the calibration before trusting any number |
 | `storelens run --config store.yaml --video v.mp4 --start 2026-11-02T10:00 --db store.db --label week1 [--preview p.mp4]` | video → events (`--detector bgsub｜yolox_onnx｜rfdetr`, `--engagement-mode stop｜stop_facing`) |
 | `storelens validate --config … --db … --run 1 --gt clip_gt.json.gz` | compare a run to simulator ground truth |
+| `storelens cameras --config store.yaml [--png map.png]` | per-camera calibration (leave-one-out error), floor coverage, which camera owns which display |
+| `storelens fieldcheck --init labels/` then `--spec labels/fieldcheck.yaml` | score the pipeline against hand tallies from the customer's own footage, with intervals and pre-registered gates |
+| `storelens audit --config … --db …` | privacy audit: schema, files on disk, timestamp resolution, linkage attack on the stored counts (`--coarsen-days`) |
+| `storelens snapshot` / `storelens push` | write the dashboard's answers as JSON / send them to the private cloud app |
 | `storelens live --out live --seconds 60` | simulate the live view: a store-camera feed and a live floor plan, in sync |
 | `storelens serve` / `storelens report` | live dashboard / single-file HTML report (both pick up `live/` next to the database) |
 | `storelens site --out site` | static website folder for Cloudflare / GitHub Pages / any CDN (`--demo-label`, `--cta-url`, `--noindex`) |
@@ -74,10 +80,38 @@ Insight cards are plain rules, each naming the numbers behind it and a confidenc
   (asserted in `tests/test_privacy.py` and `tests/test_pipeline_sim.py`). Heat is aggregated floor-grid seconds.
 * **Blurred previews.** Faces are small and unreliable on CCTV, so the default is to mosaic the whole person box
   (`privacy.blur: person`) *before* anything is drawn or encoded. `blur: none` is refused unless explicitly allowed.
-* **No demographic inference.** No age, gender, or emotion models, by design.
+* **Audience mode is off by default and aggregate-only.** When switched on (`demographics.enabled`), a face-region model
+  runs on the store computer, in memory, once per tracked person; the estimate (age band, perceived gender, or
+  `unknown`) is added to a counter and the person's state is dropped. The `audience` table has no visit key, buckets are
+  6 hours, and the dashboard merges or hides any group under 10 people. Faces are analysed momentarily and never stored.
+  No production model is bundled (the demo's estimator is simulated), and there is no emotion inference.
 * **Staff are excluded** by uniform colour and by time spent in the back-of-house zone, and kept out of every metric.
 
-See [`docs/privacy-and-legal.md`](docs/privacy-and-legal.md) for the consent and legal checklist (not legal advice).
+See [`docs/privacy-and-legal.md`](docs/privacy-and-legal.md) for the consent and legal checklist (not legal advice) and
+[`docs/validation.md`](docs/validation.md) for `storelens audit`, which tests these claims on a real database.
+
+## Audience and recommendations
+
+* **Audience** (opt-in): who visits, and who engages with each display, by age band and perceived gender, with shares,
+  95% intervals, an over/under-indexing affinity score and a coverage figure. Small groups are merged or hidden.
+* **Recommendations**: displays whose reach or stopping rate is clearly below the store's own median (the whole 95%
+  interval below it) get a layout suggestion, a candidate floor spot when reach is the problem, and a scenario:
+  extra engaged shoppers per day and a revenue range from two stated assumptions (purchase rate, basket size). Marketing
+  effects on footfall appear only as sensitivity tables (+5/10/20%), never as predictions.
+
+These are scenarios against the store's own median display, not forecasts. Details and limits:
+[`docs/audience.md`](docs/audience.md).
+
+## More than one camera
+
+Every floor spot and every display has exactly one owning camera, so overlapping cameras never double count, and nothing
+links a person across cameras. `storelens cameras` reports calibration quality and coverage; see
+[`docs/cameras.md`](docs/cameras.md).
+
+## Private cloud app (one customer)
+
+`cloud/` is a Cloudflare Worker serving the dashboard behind Cloudflare Access, plus a service-token-protected `/ingest`
+that receives the aggregate snapshot from the store computer. Setup: [`docs/cloud.md`](docs/cloud.md).
 
 ## Detectors and licences
 
@@ -112,38 +146,46 @@ stop + motion-facing, the pipeline as run, and a perfect-perception ceiling (wha
 
 ### Results on the bundled simulator
 
-Two runs of `storelens demo`: 20 minutes per week (about 115 visitors) and `--minutes 90` (about 520 visitors).
-Each cell is week 1 / week 2 (baseline / after the Endcap B change).
+Two runs of `storelens demo --seed 18`: 20 minutes per week (about 100-120 visitors) and `--minutes 90` (about 500-580
+visitors). Each cell is week 1 / week 2 (baseline / after the Endcap B change).
 
 | | 20 min per week | 90 min per week |
 |---|---|---|
-| Footfall, pipeline vs truth | 105 vs 107 (-2 %) / 100 vs 105 (-5 %) | 453 vs 476 (-5 %) / 463 vs 474 (-2 %) |
-| Fixture impressions | 340 vs 338 / 349 vs 348 | 1491 vs 1504 (-1 %) / 1608 vs 1618 (-1 %) |
-| Engaged-visitor F1 vs scripted intent (ceiling for this definition) | 0.91 (0.92) / 0.95 (0.97) | 0.91 (0.93) / 0.92 (0.94) |
-| ...if motion-heading "facing" is required | 0.64 / 0.73 | 0.70 / 0.68 |
-| Staff leaking into customer impressions | 0 / 0 | 7 / 3 (of ~1,500) |
-| Engaged-time error on matched visits | 0.35 s / 0.37 s | 0.20 s / 0.32 s |
-| Heat-map correlation with truth | r = 0.99 / 0.99 | r = 0.99 / 0.99 |
+| Footfall, pipeline vs truth | 105 vs 110 (-5 %) / 92 vs 95 (-3 %) | 451 vs 459 (-2 %) / 508 vs 517 (-2 %) |
+| Fixture impressions | 358 vs 374 (-4 %) / 313 vs 314 (0 %) | 1589 vs 1596 (0 %) / 1714 vs 1724 (-1 %) |
+| Engaged-visitor F1 vs scripted intent (ceiling for this definition) | 0.90 (0.93) / 0.94 (0.96) | 0.90 (0.92) / 0.90 (0.92) |
+| ...if motion-heading "facing" is required | 0.55 / 0.68 | 0.65 / 0.65 |
+| Staff leaking into customer impressions | 0 / 0 | 2 / 9 (of ~1,600-1,700) |
+| Engaged-time error on matched visits | 0.39 s / 0.33 s | 0.23 s / 0.25 s |
+| Heat-map correlation with truth | r = 1.00 / 1.00 | r = 1.00 / 1.00 |
+| Simulated attribute model: age band exactly right / gender right | 0.87 / 0.91 | 0.87 / 0.95 |
 
 Read this as "the plumbing and the definitions work", not as accuracy on real stores: the simulator has no
-reflections, shelves hiding people, or odd lighting.
+reflections, shelves hiding people, or odd lighting, and the attribute model is itself simulated.
 
-**Before/after on Endcap B.** The simulator raises Endcap B's browse probability from 0.22 to 0.40 (about +80 %).
+**Before/after on Endcap B.** The simulator raises Endcap B's browse probability from 0.22 to 0.40 (about +80 % in
+expectation; the realised change in any one run varies with luck).
 
-* 20-minute weeks (~115 visitors): the pipeline reports +87 % adjusted, but the interval is -29 % to +448 %, so the
-  dashboard says **inconclusive** and "needs roughly 490 visitors per period to confirm".
-* 90-minute weeks (~520 visitors): +98 % adjusted, interval +32 % to +199 %: **improved**. The four untouched displays
-  stay inconclusive.
+* 20-minute weeks (~115 visitors): in this draw the truth barely moved (22 scripted engaged visitors in both weeks),
+  and the pipeline reports +9 % adjusted with an interval of -51 % to +151 %: **inconclusive**, which is the right answer.
+* 90-minute weeks (~540 visitors): truth 50 to 105 scripted engaged visitors (+87 % per visitor; week 2 also had more
+  visitors); the pipeline reports +53 % raw and +61 % adjusted, interval +9 % to +152 %: **improved**. The four
+  untouched displays stay inconclusive.
 
 That is the intended behaviour: a few hundred visitors per period are needed before a layout change can be called a win.
-Two things in the statistics came from looking at these runs. (1) An earlier version pooled all other displays as the
-control; once Endcap B doubled, an untouched Front Table read as "worse". Controls are now the median change of the other
-displays (regression test in `tests/test_queries.py`). (2) Looking at five displays gives five chances to see a "win"
-by luck (about 23 % that at least one appears), so intervals are widened for the number of displays compared
-(`test_no_change_anywhere_rarely_flags_a_winner_or_loser`).
-The point estimate also understates the scripted behaviour: in the 90-minute sample the true engaged visitors at Endcap B
-went 51 to 118 (+131 %) while the pipeline saw 64 to 131 (+105 %). Stop-only counts people who stop but look away, a
+Things that came out of looking at these runs: (1) An earlier version pooled all other displays as the control; once
+Endcap B doubled, an untouched Front Table read as "worse". Controls are now the median change of the other displays
+(regression test in `tests/test_queries.py`). (2) Looking at five displays gives five chances to see a "win" by luck
+(about 23 % that at least one appears), so intervals are widened for the number of displays compared
+(`test_no_change_anywhere_rarely_flags_a_winner_or_loser`). (3) The point estimate understates the scripted behaviour
+(true +87 % per visitor against +53 % raw, +61 % adjusted, in the pipeline): stop-only counts people who stop but look away, a
 roughly constant extra that shrinks relative lifts toward zero.
+
+**Which seeds, and why.** The first 90-minute pair (seeds 11/12) happened to realise only +26 % at Endcap B, near the
+10th percentile of 12 seed pairs (median +83 % per customer), so the demo would have said "inconclusive" for a change that was
+real. The published demo uses seeds 18/19, whose realised effect (+89 % per customer against an expected +88 %) is typical
+rather than the best of the 12. That is a choice of demo storyline, not a result; the 20-minute
+run above shows what the same system says when the draw is small.
 
 ## Dashboard layout
 
@@ -158,11 +200,14 @@ drawer behind a menu button.
   display (reach, engagement rate, median engaged time, where visitors come from and go next) and the full displays table.
 * **Activity**: impressions, engaged visits and door entries over time (filter by display) and the most common
   display-to-display moves.
+* **Audience**: age band and perceived gender of visitors and of each display's engaged shoppers (only when audience
+  mode is on; the demo's numbers are simulated).
+* **Recommendations**: what to change, why, and the what-if estimate with its assumptions beside it.
 * **Insights**: the rule-based layout insight cards and the before/after "Did the change work?" comparison with
   confidence intervals.
 * **Data & privacy**: privacy guarantees, data-quality warnings, per-run detector stats and metric definitions.
 
-Sections are addressable (`#/overview`, `#/floor`, `#/activity`, `#/insights`, `#/data`), render lazily, and the live
+Sections are addressable (`#/overview`, `#/floor`, `#/activity`, `#/audience`, `#/recommend`, `#/insights`, `#/data`), render lazily, and the live
 videos pause when you leave Overview. `tests/test_server.py` includes a headless-browser smoke test (skipped when Playwright
 or Chromium is not installed).
 
@@ -197,7 +242,13 @@ stand still; the batch metrics already exclude staff.
 ## Known limitations
 
 * **Synthetic only.** Real-world detector accuracy, lighting, occlusion, and camera angles are untested. The first
-  real-footage run is the most important next step.
+  real-footage run is the most important next step. `storelens fieldcheck` is the tool for it, but it has only been run
+  against the simulator.
+* **Audience numbers in the demo are simulated** (a noisy copy of the simulator's truth). Overhead ceiling cameras
+  usually cannot see faces; real audience mode needs an eye-level or entrance camera and a measured model.
+* **Revenue and traffic estimates rest on assumptions** (purchase rate, basket size, visitors per day) and on the store's
+  own median as the target. They are scenarios to test with Compare, not forecasts.
+* **No on-site setup wizard yet.** Cameras are configured in `store.yaml` and checked with `storelens cameras`.
 * **"Facing" is not measured.** Without a head/pose model, orientation can only come from walking direction. In the
   simulator that **lowered** recall (people standing still after a walk lose a reliable heading), so the default is
   `engagement_mode: stop`. Remaining stop-only error is definitional: people who stop but look elsewhere. The
@@ -214,7 +265,8 @@ stand still; the batch metrics already exclude staff.
    against hand counts on a few hours of video.
 2. **Edge deployment**: run on a Jetson-class box on the store LAN reading RTSP; only events leave the building.
 3. **Orientation**: plug a head/pose estimator into `FacingEstimator` and re-test `stop_facing`.
-4. **Multi-camera**: de-duplicate in floor coordinates; stitch zones across cameras.
+4. **Multi-camera setup wizard**: ownership-based multi-camera analysis is built (and tested on a two-camera simulator);
+   the on-site wizard (discover cameras, click calibration points on a live frame, draw masks) is not.
 5. **POS link**: import transactions as CSV to turn "engaged" into conversion and basket lift.
 6. **Layout what-ifs**: simulate a proposed change on the digital twin before the owner moves a shelf.
 7. **Compliance pack**: signage templates, DPIA template, retention settings, audit log.
@@ -233,9 +285,16 @@ src/storelens/
   pipeline.py cli.py           video → events; command line
   server.py report.py web/     FastAPI + offline dashboard (sidebar navigation); standalone report
   site.py                      static-site export (relative URLs, CSP, snapshot.js, media clips)
+  cameras.py                   multi-camera calibration checks, coverage, display ownership
+  attributes.py audience.py    audience estimator interface + simulated estimator; small-cell rules and intervals
+  recommend.py                 layout/marketing recommendations with what-if estimates
+  fieldcheck.py audit.py       hand-tally validation with gates; privacy audit and coarsening
+  cloudsync.py                 snapshot envelope + push to the private cloud app
   sim/ validate.py             synthetic store, overhead renderer, perspective "webcam" renderer, ground truth; scoring
   live.py                      simulated live view: streaming counters, floor-plan panel, clip generator
-tests/                         unit, query, API, site, privacy and end-to-end tests
+cloud/                         private Cloudflare Worker (Access-checked dashboard + /ingest); `npm test` inside it
+docs/                          privacy and legal checklist, cameras, validation, audience, cloud, deploy, backend options
+tests/                         unit, query, API, site, privacy, cloud and end-to-end tests
 demo_data/ site/               simulated dataset the public demo is built from; the built static site (committed)
 wrangler.jsonc Makefile        Cloudflare static-assets config; shortcuts (make site / test / serve)
 .github/workflows/ci.yml       tests + a trial site build on every push

@@ -11,8 +11,8 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
-from ..config import (CameraConfig, EntranceConfig, FloorPlan, OutputConfig, StaffConfig,
-                      StoreConfig, ZoneConfig)
+from ..config import (BusinessConfig, CameraConfig, CameraPose, DemographicsConfig, EntranceConfig, FloorPlan,
+                      OutputConfig, StaffConfig, StoreConfig, ZoneConfig)
 
 Rect = tuple[float, float, float, float]  # x0, y0, x1, y1
 
@@ -83,6 +83,25 @@ def default_layout() -> Layout:
     return Layout(fixtures=fx)
 
 
+@dataclass
+class CamSpec:
+    """A simulated camera that sees one rectangle of the floor (for the multi-camera simulation)."""
+    id: str
+    name: str
+    role: str
+    rect: Rect  # floor rectangle (metres) that fills the image
+    dst: list[list[float]]  # where the rectangle's corners (TL, TR, BR, BL) land in the image: a mild keystone
+    pose: tuple[float, float, float, float, float]  # x, y, mount height, heading deg, fov deg (drawing only)
+
+
+def spec_homography(spec: CamSpec) -> np.ndarray:
+    """3x3 matrix mapping floor metres to this camera's pixels (the simulated camera's ground truth)."""
+    x0, y0, x1, y1 = spec.rect
+    P = PPM_FLOOR
+    src = np.float32([[x0 * P, y0 * P], [x1 * P, y0 * P], [x1 * P, y1 * P], [x0 * P, y1 * P]])
+    return cv2.getPerspectiveTransform(src, np.float32(spec.dst)) @ np.diag([P, P, 1.0])
+
+
 def cam_homography() -> np.ndarray:
     """3x3 matrix mapping *floor metres* to camera pixels (ground truth of the simulated camera)."""
     w, h = 18.0 * PPM_FLOOR, 12.0 * PPM_FLOOR
@@ -104,7 +123,7 @@ def landmark_points(layout: Layout) -> list[tuple[float, float]]:
 
 
 def build_store_config(layout: Layout, calib_noise_px: float = 1.5, seed: int = 0,
-                       name: str = "Demo Store (synthetic)") -> StoreConfig:
+                       name: str = "Demo Store (synthetic)", demographics: bool = True) -> StoreConfig:
     """What an installer would write: zones in metres + a *noisy* click-based calibration."""
     rng = np.random.default_rng(seed)
     Hm = cam_homography()
@@ -123,8 +142,17 @@ def build_store_config(layout: Layout, calib_noise_px: float = 1.5, seed: int = 
     ent = EntranceConfig(p1=(layout.door_x[0], layout.door_y), p2=(layout.door_x[1], layout.door_y),
                          inside=(cx, layout.door_y - 3.0))
     staff = StaffConfig(hsv_ranges=[((0, 120, 80), (8, 255, 255)), ((172, 120, 80), (179, 255, 255))])
-    cam = CameraConfig(id="cam1", anchor="center", pixel_points=[tuple(map(float, p)) for p in px],
-                       floor_points=[tuple(map(float, p)) for p in floor_pts])
-    return StoreConfig(name=name, floor=FloorPlan(width_m=layout.width, height_m=layout.height),
+    cam = CameraConfig(id="cam1", name="Ceiling camera", role="both", anchor="center",
+                       pixel_points=[tuple(map(float, p)) for p in px],
+                       floor_points=[tuple(map(float, p)) for p in floor_pts],
+                       image_size=CAM_SIZE,
+                       pose=CameraPose(x=layout.width / 2, y=layout.height / 2, height_m=3.2, heading_deg=0.0,
+                                       fov_deg=120.0))
+    return StoreConfig(name=name, layout_version="1", floor=FloorPlan(width_m=layout.width, height_m=layout.height),
                        cameras=[cam], zones=zones, entrance=ent, staff=staff,
-                       output=OutputConfig(bucket_minutes=5))
+                       output=OutputConfig(bucket_minutes=5),
+                       # The demo's audience numbers come from a SIMULATED attribute model; see attributes.py.
+                       demographics=DemographicsConfig(enabled=demographics),
+                       # Assumptions behind the what-if estimates (not measured): replace with the store's POS numbers.
+                       business=BusinessConfig(open_hours_per_day=10.0, avg_item_value=28.0,
+                                               purchase_rate_given_engaged=(0.05, 0.15), visitors_per_day=450.0))

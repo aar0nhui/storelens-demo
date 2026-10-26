@@ -1,0 +1,260 @@
+{
+  "layout_version": "1",
+  "runs": [
+    1,
+    2
+  ],
+  "empty_runs": [
+    3
+  ],
+  "gates": {
+    "door_min_windows": 30,
+    "door_error_max_pct": 5.0,
+    "door_bias_max_pct": 3.0,
+    "crowd_levels": [
+      [
+        1,
+        3
+      ],
+      [
+        4,
+        8
+      ],
+      [
+        9,
+        null
+      ]
+    ],
+    "crowd_min_per_level": 30,
+    "crowd_bias_max_pct": 10.0,
+    "stops_min": 100,
+    "stops_miss_max": 0.1,
+    "stops_wrong_zone_max": 0.05,
+    "walks_min_people": 30,
+    "walks_dup_max": 0.03,
+    "walks_miss_max": 0.05,
+    "empty_min_hours": 8.0,
+    "empty_false_per_hour_max": 0.25,
+    "demo_min_labelled": 200,
+    "demo_tvd_max": 0.1,
+    "demo_female_share_abs_max": 0.08,
+    "demo_min_pairs": 200,
+    "demo_age_within_one_min": 0.85,
+    "demo_gender_min": 0.85,
+    "demo_subgroup_gap_max": 0.1
+  },
+  "gates_sha": "fe4ab6e55be6",
+  "checks": [
+    {
+      "name": "door_count",
+      "n": 36,
+      "skipped_outside_footage": 0,
+      "gates": {
+        "window_error_max_pct": 5.0,
+        "bias_max_pct": 3.0,
+        "min_windows": 30
+      },
+      "status": "UNCERTAIN",
+      "status_bias": "UNCERTAIN",
+      "status_window_error": "PASS",
+      "manual_total": 977,
+      "pipeline_total": 959,
+      "bias_pct": -1.84,
+      "bias_ci_pct": [
+        -3.25,
+        -0.48
+      ],
+      "window_error_pct": 3.48,
+      "window_error_ci_pct": [
+        2.54,
+        4.47
+      ],
+      "exact_windows": 13,
+      "windows_for_pm2pts": 24,
+      "summary": "36 windows, manual 977 vs pipeline 959: bias -1.8% [-3.2, -0.5], window error 3.5% (95% CI up to 4.5%); about 24 windows would pin the bias to \u00b12 points"
+    },
+    {
+      "name": "crowd_counts",
+      "n": 352,
+      "levels": [
+        {
+          "level": "1-3",
+          "n": 107,
+          "manual": 228,
+          "pipeline": 224,
+          "bias_pct": -1.75,
+          "bias_ci_pct": [
+            -3.86,
+            0.42
+          ],
+          "direction": "undercounts",
+          "status": "PASS"
+        },
+        {
+          "level": "4-8",
+          "n": 177,
+          "manual": 1078,
+          "pipeline": 1051,
+          "bias_pct": -2.5,
+          "bias_ci_pct": [
+            -4.2,
+            -0.83
+          ],
+          "direction": "undercounts",
+          "status": "PASS"
+        },
+        {
+          "level": "9+",
+          "n": 53,
+          "manual": 552,
+          "pipeline": 531,
+          "bias_pct": -3.8,
+          "bias_ci_pct": [
+            -5.55,
+            -1.99
+          ],
+          "direction": "undercounts",
+          "status": "PASS"
+        }
+      ],
+      "empty_view_snapshots": 15,
+      "empty_view_false_people": 0,
+      "status": "PASS",
+      "gates": {
+        "bias_max_pct": 10.0,
+        "min_per_level": 30
+      },
+      "summary": "1-3 people: n=107, -1.8% (undercounts); 4-8 people: n=177, -2.5% (undercounts); 9+ people: n=53, -3.8% (undercounts)"
+    },
+    {
+      "name": "zone_stops",
+      "n": 1069,
+      "skipped_outside_footage": 0,
+      "gates": {
+        "miss_max": 0.1,
+        "wrong_zone_max": 0.05,
+        "min_labelled": 100
+      },
+      "status": "PASS",
+      "matched": 1046,
+      "wrong_zone": 2,
+      "missed": 21,
+      "recall": 0.9785,
+      "recall_ci": [
+        0.9679,
+        0.9856
+      ],
+      "wrong_zone_rate": 0.0019,
+      "wrong_zone_ci": [
+        0.0005,
+        0.0068
+      ],
+      "exhaustive": true,
+      "pipeline_stops_in_span": 1111,
+      "unlabelled_pipeline_stops": 63,
+      "precision": 0.9433,
+      "by_zone": {
+        "back_promo": {
+          "labelled": 148,
+          "matched": 143
+        },
+        "endcap_b": {
+          "labelled": 173,
+          "matched": 168
+        },
+        "front_table": {
+          "labelled": 313,
+          "matched": 308
+        },
+        "gondola_c": {
+          "labelled": 208,
+          "matched": 205
+        },
+        "wall_a": {
+          "labelled": 227,
+          "matched": 222
+        }
+      },
+      "summary": "1069 labelled stops: found 1046 (98%, CI 97%-99%), attributed to the wrong display 2 (0.2%), missed 21; precision 0.94 (63 pipeline stops nobody labelled)"
+    },
+    {
+      "name": "empty_store",
+      "n": 0,
+      "hours": 0.25,
+      "false_visits": 0,
+      "false_zone_visits": 0,
+      "false_entries": 0,
+      "false_zone_visits_by_zone": {},
+      "gates": {
+        "false_per_hour_max": 0.25,
+        "min_hours": 8.0
+      },
+      "status": "INSUFFICIENT",
+      "false_per_hour": 0.0,
+      "false_per_hour_upper95": 14.757,
+      "summary": "0.2 h of empty store: 0 tracks, 0 zone visits, 0 door entries (0.00/h, 95% upper bound 14.76/h) - zero events needs about 12 h to show <0.25/h"
+    },
+    {
+      "name": "audience_mix",
+      "n": 1034,
+      "gates": {
+        "tvd_max": 0.1,
+        "female_share_abs_max": 0.08,
+        "min_labelled": 200
+      },
+      "status": "PASS",
+      "tvd": 0.0168,
+      "per_band": {
+        "<13": {
+          "labelled": 0.0426,
+          "labelled_ci": [
+            0.0318,
+            0.0566
+          ],
+          "system": 0.0461
+        },
+        "13-24": {
+          "labelled": 0.1789,
+          "labelled_ci": [
+            0.1568,
+            0.2035
+          ],
+          "system": 0.1921
+        },
+        "25-44": {
+          "labelled": 0.3675,
+          "labelled_ci": [
+            0.3387,
+            0.3973
+          ],
+          "system": 0.3672
+        },
+        "45-64": {
+          "labelled": 0.2698,
+          "labelled_ci": [
+            0.2437,
+            0.2977
+          ],
+          "system": 0.2552
+        },
+        "65+": {
+          "labelled": 0.1412,
+          "labelled_ci": [
+            0.1213,
+            0.1638
+          ],
+          "system": 0.1394
+        }
+      },
+      "bands_outside_label_ci": [],
+      "female_share_labelled": 0.5677,
+      "female_share_system": 0.5727,
+      "female_share_diff": 0.005,
+      "system_visitors": 1088,
+      "system_unknown_share": 0.0239,
+      "summary": "labelled 1034 people vs 1088 stored visitors: age-mix TVD 0.02, female share 0.57 labelled vs 0.57 system"
+    }
+  ],
+  "overall": "UNCERTAIN",
+  "caveat": "Labels are only as good as the annotators: have a second person label a subset and report their agreement. Judge on held-out days chosen BEFORE seeing the results."
+}

@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy.ndimage import uniform_filter1d
 
-from .config import EntranceConfig, StoreConfig, Thresholds, ZoneConfig
+from .config import EntranceConfig, StoreConfig
 from .geometry import angle_diff, points_in_polygon
 
 NAN = float("nan")

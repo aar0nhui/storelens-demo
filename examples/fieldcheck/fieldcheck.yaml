@@ -1,0 +1,13 @@
+# Example spec. On a real store: commit the gates BEFORE looking at results, then run
+#   storelens fieldcheck --config store.yaml --db storelens.db --spec fieldcheck.yaml
+runs: [1, 2]
+empty_runs: [3]   # replaced by scripts/run_fieldcheck_example.sh after processing the empty-store clip
+door_tally: door_tally.csv
+crowd: crowd.csv
+stops: stops.csv
+stops_exhaustive: true
+demo_labels: demo_labels.csv
+gates:
+  door_min_windows: 30
+  door_error_max_pct: 5.0
+  door_bias_max_pct: 3.0

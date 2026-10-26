@@ -49,14 +49,21 @@ def _check_cta(url: str | None) -> str | None:
     return url
 
 
-def build_site(db_path: str, config_path: str, out_dir: str, live_dir: str | None = None,
+def build_site(db_path: str | None, config_path: str | None, out_dir: str, live_dir: str | None = None,
                demo_label: str | None = None, cta_text: str | None = None, cta_url: str | None = None,
-               noindex: bool = False) -> dict:
-    """Write the static site into ``out_dir`` and return a small summary (paths and byte sizes)."""
+               noindex: bool = False, private: bool = False) -> dict:
+    """Write the static site into ``out_dir`` and return a small summary (paths and byte sizes).
+
+    ``private=True`` writes the app shell only, for the private cloud Worker (``cloud/``): no database, no snapshot and
+    no clips are read or written. The Worker serves ``data/snapshot.js`` itself, from the latest snapshot the store's
+    computer pushed, after checking the Cloudflare Access login."""
     cta_url = _check_cta(cta_url)
-    cfg = load_config(config_path)
-    live = find_live(db_path, live_dir)
-    snap = build_snapshot(db_path, cfg, None)  # clips stay separate files here, not base64 inside the snapshot
+    if private:
+        cfg, live, snap, noindex = None, None, None, True
+    else:
+        cfg = load_config(config_path)
+        live = find_live(db_path, live_dir)
+        snap = build_snapshot(db_path, cfg, None)  # clips stay separate files here, not base64 inside the snapshot
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     for name in OWNED:  # rebuild from scratch, but only touch what we own
@@ -74,11 +81,14 @@ def build_site(db_path: str, config_path: str, out_dir: str, live_dir: str | Non
             shutil.copy2(live / Path(info[key]).name, out / "media" / Path(info[key]).name)
         snap["/api/live"] = info
 
-    demo = {k: v for k, v in {"label": demo_label, "ctaText": cta_text, "ctaUrl": cta_url}.items() if v}
-    js = "window.__STORELENS_SNAPSHOT__ = " + json.dumps(snap, default=float, separators=(",", ":")) + ";\n"
-    if demo:
-        js += "window.__STORELENS_DEMO__ = " + json.dumps(demo) + ";\n"
-    (out / "data" / "snapshot.js").write_text(js, encoding="utf-8")
+    if not private:
+        demo = {k: v for k, v in {"label": demo_label, "ctaText": cta_text, "ctaUrl": cta_url}.items() if v}
+        js = "window.__STORELENS_SNAPSHOT__ = " + json.dumps(snap, default=float, separators=(",", ":")) + ";\n"
+        if demo:
+            js += "window.__STORELENS_DEMO__ = " + json.dumps(demo) + ";\n"
+        (out / "data" / "snapshot.js").write_text(js, encoding="utf-8")
+    else:
+        (out / "data").rmdir()
 
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
     head_extra = f'<meta http-equiv="Content-Security-Policy" content="{CSP}">\n'
@@ -91,7 +101,8 @@ def build_site(db_path: str, config_path: str, out_dir: str, live_dir: str | Non
     assert "Content-Security-Policy" in html and "data/snapshot.js" in html
     (out / "index.html").write_text(html, encoding="utf-8")
     (out / "404.html").write_text(NOT_FOUND, encoding="utf-8")
-    (out / "_headers").write_text(HEADERS, encoding="utf-8")
+    if not private:  # the Worker sets its own headers
+        (out / "_headers").write_text(HEADERS, encoding="utf-8")
     (out / "robots.txt").write_text("User-agent: *\n" + ("Disallow: /\n" if noindex else "Allow: /\n"), encoding="utf-8")
     (out / ".nojekyll").write_text("", encoding="utf-8")  # GitHub Pages: serve files as they are
 

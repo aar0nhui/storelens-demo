@@ -39,6 +39,8 @@ class Person:
     clothing: tuple[int, int, int]
     hair: tuple[int, int, int]
     script: list[dict] = field(default_factory=list)
+    age_band: str = ""  # simulated truth (customers only); what an attribute model would be trying to estimate
+    gender: str = ""
 
     @property
     def end_frame(self) -> int:

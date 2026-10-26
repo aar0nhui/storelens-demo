@@ -6,19 +6,24 @@ import math
 import cv2
 import numpy as np
 
-from .layout import CAM_DST, CAM_SIZE, PPM_FLOOR, Layout
+from .layout import CAM_DST, CAM_SIZE, PPM_FLOOR, CamSpec, Layout
 
 FLOOR_BGR = (206, 209, 213)
 
 
 class Renderer:
-    def __init__(self, layout: Layout, seed: int = 0):
+    def __init__(self, layout: Layout, seed: int = 0, spec: CamSpec | None = None):
         self.layout = layout
         self.rng = np.random.default_rng(seed)
         self.W = int(layout.width * PPM_FLOOR)
         self.H = int(layout.height * PPM_FLOOR)
-        src = np.float32([[0, 0], [self.W, 0], [self.W, self.H], [0, self.H]])
-        self.Hc = cv2.getPerspectiveTransform(src, CAM_DST)
+        if spec is None:  # one camera sees the whole floor
+            src = np.float32([[0, 0], [self.W, 0], [self.W, self.H], [0, self.H]])
+            self.Hc = cv2.getPerspectiveTransform(src, CAM_DST)
+        else:  # this camera sees one rectangle of it
+            x0, y0, x1, y1 = (v * PPM_FLOOR for v in spec.rect)
+            src = np.float32([[x0, y0], [x1, y0], [x1, y1], [x0, y1]])
+            self.Hc = cv2.getPerspectiveTransform(src, np.float32(spec.dst))
         self.canvas = self._static_canvas()
         w, h = CAM_SIZE
         yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)

@@ -64,3 +64,20 @@ def test_database_schema_has_no_place_for_trajectories_or_images(tmp_path):
     tables = {r[0] for r in st.query("SELECT name FROM sqlite_master WHERE type='table'")}
     assert "sqlite_sequence" in tables or True
     assert not any("traj" in t or "frame" in t or "embed" in t for t in tables)
+
+
+def test_audience_table_is_aggregate_only_and_visit_tables_hold_no_demographics(tmp_path):
+    from storelens.store import EventStore
+    st = EventStore(tmp_path / "x.db")
+    cols = lambda t: [r[1] for r in st.query(f"PRAGMA table_info({t})")]  # noqa: E731
+    assert cols("audience") == ["run_id", "bucket_ts", "zone_id", "metric", "age_band", "gender", "n"]
+    demographic = {"age", "age_band", "gender", "sex", "female", "male"}
+    for t in ("visits", "zone_visits", "entries", "heat", "runs"):
+        assert not demographic & set(cols(t)), f"{t} must not carry demographics: they would join to a visit"
+    assert "visit_key" not in cols("audience"), "no key that could join an audience row back to a visit"
+
+
+def test_no_face_or_image_artifacts_in_the_schema_scan(tmp_path):
+    from storelens.audit import schema_scan
+    from storelens.store import EventStore
+    assert schema_scan(EventStore(tmp_path / "x.db"))["status"] == "PASS"

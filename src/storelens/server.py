@@ -6,13 +6,15 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from .cameras import CameraNetwork
 from .config import StoreConfig, load_config
 from .insights import generate_insights
 from .queries import Analytics, Window
+from .recommend import recommend
 from .store import EventStore
 
 WEB_DIR = Path(__file__).parent / "web"
@@ -53,19 +55,30 @@ def live_info(live: Path | None, url_prefix: str = "/media/") -> dict:
     return info
 
 
+def _sessions(runs: list[dict]) -> list[list[int]]:
+    """Group runs recorded together (same label and start time, one per camera) into sessions of run ids."""
+    groups: dict[tuple, list[int]] = {}
+    for r in runs:
+        groups.setdefault((r["label"], round(r["t_start"])), []).append(r["run_id"])
+    return list(groups.values())
+
+
 def build_snapshot(db_path: str, cfg: StoreConfig, live: Path | None = None) -> dict:
     """Pre-computed answers to every default dashboard query, keyed by URL (used by the static report)."""
     store = EventStore(db_path)
     an = Analytics(store, cfg)
     runs = an.runs()
-    snap: dict = {"/api/config": an.config_view(), "/api/runs": runs}
+    snap: dict = {"/api/config": an.config_view(), "/api/runs": runs, "/api/cameras": CameraNetwork(cfg).describe()}
     if live is not None:  # embed the clips so the report stays a single self-contained file
         info = json.loads((live / "live.json").read_text())
         for key in ("camera", "floorplan"):
             raw = (live / info[key]).read_bytes()
             info[key] = "data:video/mp4;base64," + base64.b64encode(raw).decode()
         snap["/api/live"] = info
-    selections: list[tuple[str, Window]] = [("", Window())] + [(f"?runs={r['run_id']}", Window([r["run_id"]])) for r in runs]
+    # one selection per recording session (several cameras = several runs analysed together)
+    sessions = _sessions(runs)
+    selections: list[tuple[str, Window]] = [("", Window())] + [(f"?runs={','.join(map(str, ids))}", Window(ids))
+                                                                for ids in sessions]
     for suffix, w in selections:
         sep = "&" if suffix else "?"
         zones = an.zones(w)
@@ -79,12 +92,16 @@ def build_snapshot(db_path: str, cfg: StoreConfig, live: Path | None = None) -> 
         snap["/api/flows" + suffix] = flows
         snap["/api/insights" + suffix] = generate_insights(zones, flows)
         snap["/api/quality" + suffix] = an.quality(w)
-    if len(runs) >= 2:
-        a, b = runs[0]["run_id"], runs[1]["run_id"]
-        cmp_ = an.lift(Window([a]), Window([b]))
+        aud = an.audience(w)
+        snap["/api/audience" + suffix] = aud
+        snap["/api/recommendations" + suffix] = recommend(an, w, aud)
+    if len(sessions) >= 2:
+        a_ids, b_ids = sessions[0], sessions[1]
+        a, b = ",".join(map(str, a_ids)), ",".join(map(str, b_ids))
+        cmp_ = an.lift(Window(a_ids), Window(b_ids))
         snap[f"/api/compare?a={a}&b={b}"] = cmp_
-        zones_b = an.zones(Window([b]))
-        snap[f"/api/insights?a={a}&b={b}"] = generate_insights(zones_b, an.flows(Window([b])), cmp_)
+        zones_b = an.zones(Window(b_ids))
+        snap[f"/api/insights?a={a}&b={b}"] = generate_insights(zones_b, an.flows(Window(b_ids)), cmp_)
     store.close()
     return snap
 
@@ -108,6 +125,11 @@ def create_app(db_path: str, config_path: str, live_dir: str | None = None) -> F
             return a.config_view()
         finally:
             s.close()
+
+    @app.get("/api/cameras")
+    def cameras():
+        """Cameras, their calibration quality, floor coverage and which camera owns which display."""
+        return CameraNetwork(cfg).describe()
 
     @app.get("/api/runs")
     def runs():
@@ -158,13 +180,13 @@ def create_app(db_path: str, config_path: str, live_dir: str | None = None) -> F
             s.close()
 
     @app.get("/api/insights")
-    def insights(runs: str | None = None, a: int | None = None, b: int | None = None):
+    def insights(runs: str | None = None, a: str | None = None, b: str | None = None):
         s, an = analytics()
         try:
             lift = None
             if a is not None and b is not None:
-                lift = an.lift(Window([a]), Window([b]))
-                w = Window([b])
+                lift = an.lift(Window(_parse_runs(a)), Window(_parse_runs(b)))
+                w = Window(_parse_runs(b))
             else:
                 w = Window(_parse_runs(runs))
             return generate_insights(an.zones(w), an.flows(w), lift)
@@ -172,11 +194,28 @@ def create_app(db_path: str, config_path: str, live_dir: str | None = None) -> F
             s.close()
 
     @app.get("/api/compare")
-    def compare(a: int, b: int, zones: str | None = None, controls: str | None = None):
+    def compare(a: str, b: str, zones: str | None = None, controls: str | None = None):
         s, an = analytics()
         try:
-            return an.lift(Window([a]), Window([b]), zones.split(",") if zones else None,
+            return an.lift(Window(_parse_runs(a)), Window(_parse_runs(b)), zones.split(",") if zones else None,
                            controls.split(",") if controls else None)
+        finally:
+            s.close()
+
+    @app.get("/api/audience")
+    def audience(runs: str | None = None, t0: str | None = None, t1: str | None = None, k: int | None = None):
+        s, a = analytics()
+        try:
+            return a.audience(window(runs, t0, t1), k)
+        finally:
+            s.close()
+
+    @app.get("/api/recommendations")
+    def recommendations(runs: str | None = None, t0: str | None = None, t1: str | None = None):
+        s, a = analytics()
+        try:
+            w = window(runs, t0, t1)
+            return recommend(a, w, a.audience(w))
         finally:
             s.close()
 

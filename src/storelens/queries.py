@@ -23,6 +23,9 @@ import numpy as np
 from scipy.stats import norm
 
 from .analysis import engaged_seconds
+from .attributes import GENDERS
+from .audience import band_label, index_ci, known_total, merge_groups, share_ci
+from .cameras import CameraNetwork
 from .config import StoreConfig
 from .store import EventStore
 
@@ -63,6 +66,30 @@ class Analytics:
         self.mode = cfg.thresholds.engagement_mode
         self.fixtures = [z for z in cfg.zones if z.kind == "fixture"]
         self.measured = cfg.measured_zones()
+        # Several cameras: visitors are counted by the entrance camera(s) and each display by its owning camera only.
+        self.multi = cfg.multi_camera
+        self.zone_owner = CameraNetwork(cfg).zone_owners() if self.multi else {}
+        self._run_cam_cache: dict[int, str] | None = None
+
+    def _run_cams(self) -> dict[int, str]:
+        if self._run_cam_cache is None:
+            self._run_cam_cache = {rid: cam for rid, cam in self.store.query("SELECT run_id,camera_id FROM runs")}
+        return self._run_cam_cache
+
+    def _role(self, camera_id: str | None) -> str:
+        try:
+            return self.cfg.camera(camera_id).role
+        except KeyError:
+            return "both"
+
+    def _visitor_runs_sql(self) -> tuple[str, list]:
+        """SQL restricting to runs from cameras that define visitors (multi-camera only)."""
+        if not self.multi:
+            return "", []
+        ids = [rid for rid, cam in self._run_cams().items() if self._role(cam) in ("entrance", "both")]
+        if not ids:
+            return " AND 0", []
+        return f" AND run_id IN ({','.join('?' * len(ids))})", ids
 
     # ------------------------------------------------------------------------------- basics
     def iso(self, t: float) -> str:
@@ -78,8 +105,12 @@ class Analytics:
 
     def _visits(self, w: Window) -> list[tuple[int, str, float, float]]:
         where, args = w.sql("t_first")
+        extra, eargs = self._visitor_runs_sql()
+        if self.multi:  # a visitor is someone who came through the door: tracks born at a camera hand-off are not
+            extra += " AND (run_id, visit_key) IN (SELECT run_id, visit_key FROM entries WHERE direction=1)"
         return self.store.query(
-            f"SELECT run_id,visit_key,t_first,duration_s FROM visits WHERE role='customer' AND {where}", tuple(args))
+            f"SELECT run_id,visit_key,t_first,duration_s FROM visits WHERE role='customer' AND {where}{extra}",
+            tuple(args + eargs))
 
     def _zone_rows(self, w: Window):
         where, args = w.sql("t_enter")
@@ -88,7 +119,10 @@ class Analytics:
             f"FROM zone_visits WHERE {where} AND {_CUSTOMER_ONLY}", tuple(args))
         zmeta = {z.id: (z.kind, self.cfg.engage_seconds(z)) for z in self.cfg.zones}
         out = []
+        run_cam = self._run_cams() if self.multi else {}
         for rid, key, zid, te, tx, dwell, stp, fst in rows:
+            if self.multi and self.zone_owner.get(zid) != run_cam.get(rid):
+                continue  # only a display's owning camera measures it
             kind, min_s = zmeta.get(zid, ("area", 1e9))
             eng_s = engaged_seconds(stp, fst, self.mode)
             out.append((rid, key, zid, te, tx, dwell, eng_s, kind == "fixture" and eng_s >= min_s))
@@ -96,7 +130,9 @@ class Analytics:
 
     def _entries(self, w: Window) -> list[tuple[float, int]]:
         where, args = w.sql("t")
-        return self.store.query(f"SELECT t,direction FROM entries WHERE {where} AND {_CUSTOMER_ONLY}", tuple(args))
+        extra, eargs = self._visitor_runs_sql()
+        return self.store.query(f"SELECT t,direction FROM entries WHERE {where} AND {_CUSTOMER_ONLY}{extra}",
+                                tuple(args + eargs))
 
     # ------------------------------------------------------------------------------- summary
     def summary(self, w: Window) -> dict:
@@ -270,10 +306,171 @@ class Analytics:
         """
         all_ids = [z.id for z in self.fixtures]
         zones = zone_ids or all_ids
-        eng_a, rch_a = self._outcomes(a, all_ids)
-        eng_b, rch_b = self._outcomes(b, all_ids)
         names = {z.id: z.name for z in self.fixtures}
-        return lift_stats(eng_a, eng_b, rch_a, rch_b, all_ids, zones, names, control_ids, n_boot, seed)
+        versions = {str(r["meta"].get("layout_version", "?")) for r in self.runs()
+                    if r["run_id"] in set((a.run_ids or []) + (b.run_ids or []))}
+        out = None
+        if self.multi:
+            ea, ra_, da = self._block_outcomes(a, all_ids)
+            eb, rb_, db = self._block_outcomes(b, all_ids)
+            out = lift_stats(ea, eb, ra_, rb_, all_ids, zones, names, control_ids, n_boot, seed, den_a=da, den_b=db)
+        else:
+            eng_a, rch_a = self._outcomes(a, all_ids)
+            eng_b, rch_b = self._outcomes(b, all_ids)
+            out = lift_stats(eng_a, eng_b, rch_a, rch_b, all_ids, zones, names, control_ids, n_boot, seed)
+        if len(versions) > 1:  # the floor plan changed between the two windows: that is the point, but say so
+            out["layout_versions"] = sorted(versions)
+        return out
+
+    def _block_outcomes(self, w: Window, zone_ids: list[str]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Several cameras: per time block, engaged / reached counts per display and the number of store visitors."""
+        bucket = self.cfg.output.bucket_minutes * 60.0
+        vis = self._visits(w)
+        zi = {z: i for i, z in enumerate(zone_ids)}
+        blocks: dict[int, int] = {}
+        for _, _, t_first, _ in vis:
+            blocks.setdefault(int(math.floor(t_first / bucket)), 0)
+            blocks[int(math.floor(t_first / bucket))] += 1
+        eng_set, rch_set = set(), set()
+        for rid, key, zid, te, tx, dwell, eng_s, e in self._zone_rows(w):
+            z = zi.get(zid)
+            if z is None:
+                continue
+            b = int(math.floor(te / bucket))
+            blocks.setdefault(b, 0)
+            rch_set.add((rid, key, zid, b))
+            if e:
+                eng_set.add((rid, key, zid, b))
+        order = {b: i for i, b in enumerate(sorted(blocks))}
+        eng = np.zeros((len(order), len(zone_ids)))
+        rch = np.zeros_like(eng)
+        for rid, key, zid, b in eng_set:
+            eng[order[b], zi[zid]] += 1
+        for rid, key, zid, b in rch_set:
+            rch[order[b], zi[zid]] += 1
+        den = np.array([blocks[b] for b in sorted(blocks)], float)
+        return eng, rch, den
+
+    # ------------------------------------------------------------------------------- audience
+    def _audience_cells(self, w: Window) -> dict[tuple[str, str], dict[tuple[str, str], int]]:
+        where, args = w.sql("bucket_ts")
+        data: dict[tuple[str, str], dict[tuple[str, str], int]] = {}
+        for zone, metric, age, gender, n in self.store.query(
+                f"SELECT zone_id,metric,age_band,gender,SUM(n) FROM audience WHERE {where} "
+                f"GROUP BY zone_id,metric,age_band,gender", tuple(args)):
+            data.setdefault((zone, metric), {})[(age, gender)] = int(n)
+        return data
+
+    def audience(self, w: Window, k: int | None = None) -> dict:
+        """Age band / perceived gender of the audience, per display, with small-count protection (see audience.py).
+
+        Shares and over/under-indexing ("who is over-represented among the people engaging with this display
+        compared with everyone who visited") come with intervals; groups below ``k`` people are merged or hidden."""
+        d = self.cfg.demographics
+        if not d.enabled:
+            return {"enabled": False}
+        k = max(int(k or d.min_cell), d.min_cell)
+        bands = list(d.age_bands)
+        runs = [r for r in self.runs() if not (w.run_ids and r["run_id"] not in w.run_ids)]
+        dm = [r["meta"].get("demographics", {}) for r in runs]
+        simulated = any(m.get("simulated") for m in dm)
+        base = {"enabled": True, "min_cell": k, "bands": bands, "simulated": simulated,
+                "estimators": sorted({m.get("estimator", "?") for m in dm if m.get("enabled")}),
+                "notes": [
+                    "Age band and gender are ESTIMATES made in memory from appearance; nothing per person is stored. "
+                    "'Perceived gender' is what a model infers, not a fact about anyone.",
+                    f"Groups with fewer than {k} people are merged into neighbouring age bands or hidden.",
+                ]}
+        if simulated:
+            base["notes"].append("Demo data: the attribute model is SIMULATED (a noisy copy of the simulator's ground "
+                                 "truth with illustrative accuracy). Real accuracy depends on camera angle and "
+                                 "resolution and must be measured on site.")
+        data = self._audience_cells(w)
+        vis = data.get(("", "visitor"), {})
+        if not vis:
+            return {**base, "has_data": False}
+        n_tracked = len(self._visits(w))
+
+        def age_c(cell):
+            out: dict[str, int] = {}
+            for (a, g), n in cell.items():
+                out[a] = out.get(a, 0) + n
+            return out
+
+        def gen_c(cell):
+            out: dict[str, int] = {}
+            for (a, g), n in cell.items():
+                out[g] = out.get(g, 0) + n
+            return out
+
+        vis_age, vis_gen = age_c(vis), gen_c(vis)
+        total = sum(vis.values())
+        vis_age_known, vis_gen_known = known_total(vis_age), known_total(vis_gen)
+        cov = {"visitors_counted": total, "tracked_visitors": n_tracked,
+               "age_known_share": round(vis_age_known / total, 3) if total else None,
+               "gender_known_share": round(vis_gen_known / total, 3) if total else None}
+
+        def groups_for(counts: dict[str, int]) -> list[list[str]]:
+            return merge_groups({b: counts.get(b, 0) for b in bands}, bands, k)
+
+        age_groups = groups_for(vis_age)
+        by_age = [{"label": band_label(g), "bands": g, "n": sum(vis_age.get(b, 0) for b in g),
+                   "share": sum(vis_age.get(b, 0) for b in g) / vis_age_known,
+                   "ci": share_ci(sum(vis_age.get(b, 0) for b in g), vis_age_known)} for g in age_groups] \
+            if vis_age_known else []
+        gen_ok = all(vis_gen.get(g, 0) >= k for g in GENDERS)
+        by_gender = [{"label": g, "n": vis_gen.get(g, 0), "share": vis_gen.get(g, 0) / vis_gen_known,
+                      "ci": share_ci(vis_gen.get(g, 0), vis_gen_known)} for g in GENDERS] if gen_ok else None
+        matrix = None
+        if age_groups and gen_ok:
+            cells = [[sum(vis.get((b, g), 0) for b in grp) for g in GENDERS] for grp in age_groups]
+            if all(c >= k for row in cells for c in row):
+                tot = sum(sum(r) for r in cells)
+                matrix = {"rows": [band_label(g) for g in age_groups], "cols": list(GENDERS), "n": cells,
+                          "share": [[c / tot for c in row] for row in cells]}
+
+        zones_out = []
+        highlights = []
+        for z in self.measured:
+            impr, eng = data.get((z.id, "impression"), {}), data.get((z.id, "engaged"), {})
+            fixture = z.kind == "fixture"
+            basecell = eng if fixture else impr
+            entry = {"zone_id": z.id, "name": z.name, "kind": z.kind, "base": "engaged" if fixture else "impressions",
+                     "n": sum(basecell.values()), "age": None, "gender": None}
+            b_age, b_gen = age_c(basecell), gen_c(basecell)
+            i_age, i_gen, e_age, e_gen = age_c(impr), gen_c(impr), age_c(eng), gen_c(eng)
+            b_age_known, b_gen_known = known_total(b_age), known_total(b_gen)
+
+            def build(label: str, members: list[list[str]], b_c, b_known, v_c, v_known, i_c, e_c):
+                rows = []
+                for grp in members:
+                    nb = sum(b_c.get(m, 0) for m in grp)
+                    nv, ni, ne = (sum(c.get(m, 0) for m in grp) for c in (v_c, i_c, e_c))
+                    ix = index_ci(nb, b_known, nv, v_known)
+                    lab = band_label(grp) if label == "age" else grp[0]
+                    row = {"label": lab, "members": list(grp), "n": nb, "visitors": nv, "impressions": ni, "engaged": ne,
+                           "share": nb / b_known if b_known else None,
+                           "ci": share_ci(nb, b_known), "visitor_share": nv / v_known if v_known else None,
+                           "reach": ni / nv if nv else None,
+                           "engagement_rate": (ne / ni if ni else None) if fixture else None,
+                           "engagement_rate_ci": share_ci(ne, ni) if (fixture and ni) else None, **ix}
+                    rows.append(row)
+                    if ix["verdict"] in ("over", "under"):
+                        highlights.append({"zone_id": z.id, "zone": z.name, "dimension": label, "group": lab,
+                                           "n": nb, **ix})
+                return rows
+
+            ag = groups_for(b_age)
+            if len(ag) > 1 and b_age_known:  # one merged group = no split worth showing
+                entry["age"] = build("age", ag, b_age, b_age_known, vis_age, vis_age_known, i_age, e_age)
+            if all(b_gen.get(g, 0) >= k for g in GENDERS) and b_gen_known:
+                entry["gender"] = build("gender", [[g] for g in GENDERS], b_gen, b_gen_known, vis_gen, vis_gen_known,
+                                        i_gen, e_gen)
+            entry["confidence"] = "high" if entry["n"] >= 100 else ("medium" if entry["n"] >= 40 else "low")
+            zones_out.append(entry)
+        highlights.sort(key=lambda h: -abs(math.log(h["index"])) if h["index"] else 0)
+        return {**base, "has_data": True, "coverage": cov, "store": {"n": vis_age_known, "by_age": by_age,
+                "by_gender": by_gender, "matrix": matrix}, "zones": zones_out, "highlights": highlights[:12]}
 
     # ------------------------------------------------------------------------------- quality
     def quality(self, w: Window | None = None) -> dict:
@@ -298,6 +495,8 @@ class Analytics:
         return {"runs": runs, "warnings": warnings,
                 "privacy": {"raw_frames_stored": 0, "faces_stored": 0, "trajectories_stored": False,
                             "appearance_reid": False, "blur_mode": self.cfg.privacy.blur,
+                            "demographics": "aggregate_counts_only" if self.cfg.demographics.enabled else "off",
+                            "per_person_attributes_stored": False,
                             "id_rotation_hours": self.cfg.privacy.id_rotation_hours}}
 
     def config_view(self) -> dict:
@@ -314,11 +513,22 @@ class Analytics:
 
 def lift_stats(eng_a: np.ndarray, eng_b: np.ndarray, rch_a: np.ndarray, rch_b: np.ndarray, all_ids: list[str],
                zones: list[str], names: dict[str, str], control_ids: list[str] | None = None, n_boot: int = 4000,
-               seed: int = 7, alpha: float = 0.05) -> dict:
-    """The statistics behind ``Analytics.lift``, on per-visitor 0/1 outcome matrices (visitors x displays)."""
+               seed: int = 7, alpha: float = 0.05, den_a: np.ndarray | None = None,
+               den_b: np.ndarray | None = None) -> dict:
+    """The statistics behind ``Analytics.lift``.
+
+    Default: per-visitor 0/1 outcome matrices (visitors x displays); the bootstrap resamples visitors.
+    With ``den_a``/``den_b`` (several cameras): rows are TIME BLOCKS holding counts of engaged/reached visitors per
+    display and the number of store visitors in the block; the bootstrap resamples blocks and the rate is
+    sum(engaged) / sum(visitors). Visitors cannot be linked across cameras, so blocks are the honest unit; the
+    intervals are wider for it."""
+    blocks = den_a is not None
     na, nb = len(eng_a), len(eng_b)
-    if na < 5 or nb < 5:
-        return {"error": "not enough visitors in one of the windows", "visitors": {"a": na, "b": nb}}
+    vis_a = int(den_a.sum()) if blocks else na
+    vis_b = int(den_b.sum()) if blocks else nb
+    if na < 5 or nb < 5 or vis_a < 5 or vis_b < 5:
+        return {"error": "not enough visitors in one of the windows" if not blocks else
+                "not enough visitors or time blocks in one of the windows", "visitors": {"a": vis_a, "b": vis_b}}
     rng = np.random.default_rng(seed)
     ia = rng.integers(0, na, (n_boot, na))
     ib = rng.integers(0, nb, (n_boot, nb))
@@ -327,24 +537,31 @@ def lift_stats(eng_a: np.ndarray, eng_b: np.ndarray, rch_a: np.ndarray, rch_b: n
     q_lo, q_hi = 100 * alpha / (2 * k), 100 * (1 - alpha / (2 * k))
     ya = {f: eng_a[:, i].astype(float) for f, i in col.items()}
     yb = {f: eng_b[:, i].astype(float) for f, i in col.items()}
+
+    def rate(y, idx, den):  # bootstrap rate per resample
+        return y[idx].mean(axis=1) if den is None else y[idx].sum(axis=1) / den[idx].sum(axis=1)
+
+    def point(y, den):
+        return float(y.mean()) if den is None else float(y.sum() / den.sum())
+
     ratio = {}
     with np.errstate(divide="ignore", invalid="ignore"):
         for f in all_ids:
-            ratio[f] = yb[f][ib].mean(axis=1) / ya[f][ia].mean(axis=1)  # bootstrap lift ratios, (n_boot,)
+            ratio[f] = rate(yb[f], ib, den_b) / rate(ya[f], ia, den_a)  # bootstrap lift ratios, (n_boot,)
     results = []
     for z in zones:
         ctrl = [c for c in (control_ids or all_ids) if c != z]
-        ra, rb = ya[z].mean(), yb[z].mean()
+        ra, rb = point(ya[z], den_a), point(yb[z], den_b)
         entry = {
             "zone_id": z, "name": names.get(z, z), "controls": ctrl,
-            "a": {"visitors": na, "engaged_visitors": int(ya[z].sum()), "per_100": ra * 100,
-                  "reach_pct": float(rch_a[:, col[z]].mean() * 100)},
-            "b": {"visitors": nb, "engaged_visitors": int(yb[z].sum()), "per_100": rb * 100,
-                  "reach_pct": float(rch_b[:, col[z]].mean() * 100)},
+            "a": {"visitors": vis_a, "engaged_visitors": int(ya[z].sum()), "per_100": ra * 100,
+                  "reach_pct": float((rch_a[:, col[z]].sum() / den_a.sum() if blocks else rch_a[:, col[z]].mean()) * 100)},
+            "b": {"visitors": vis_b, "engaged_visitors": int(yb[z].sum()), "per_100": rb * 100,
+                  "reach_pct": float((rch_b[:, col[z]].sum() / den_b.sum() if blocks else rch_b[:, col[z]].mean()) * 100)},
         }
         entry.update(_raw_ci(ra, rb, ratio[z], q_lo, q_hi))
         entry["visitors_needed_per_period"] = _visitors_needed(ra, rb, k)
-        pts = [yb[c].mean() / ya[c].mean() for c in ctrl if ya[c].mean() > 0]
+        pts = [point(yb[c], den_b) / point(ya[c], den_a) for c in ctrl if point(ya[c], den_a) > 0]
         if pts and ra > 0:
             ctrl_point = float(np.median(pts))
             with warnings.catch_warnings():
@@ -360,10 +577,11 @@ def lift_stats(eng_a: np.ndarray, eng_b: np.ndarray, rch_a: np.ndarray, rch_b: n
                                      "p_improved": float((adj > 0).mean())}
         results.append(entry)
     level = 100 * (1 - alpha / k)
-    return {"visitors": {"a": na, "b": nb}, "zones": results, "n_boot": n_boot, "n_compared": k,
-            "ci_level_pct": round(level, 1),
+    unit = "time blocks (visitors cannot be linked across cameras)" if blocks else "visitors"
+    return {"visitors": {"a": vis_a, "b": vis_b}, "zones": results, "n_boot": n_boot, "n_compared": k,
+            "ci_level_pct": round(level, 1), "unit": "blocks" if blocks else "visitors",
             "note": (f"Lift in engaged visitors per 100 store visitors. Intervals are {level:.0f}% bootstrap CIs over "
-                     f"visitors, widened so that comparing {k} display{'s' if k != 1 else ''} keeps the family-wise error "
+                     f"{unit}, widened so that comparing {k} display{'s' if k != 1 else ''} keeps the family-wise error "
                      f"at {alpha:.0%}. The adjusted lift divides by the median change of the other displays.")}
 
 

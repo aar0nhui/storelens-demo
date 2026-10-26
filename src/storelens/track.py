@@ -65,6 +65,7 @@ class TrackManager:
         # (track uid, floor xy, staff vote) for every confirmed track matched in the most recent frame.
         # In-memory only, for live views; nothing here is persisted.
         self.last: list[tuple[int, np.ndarray, bool]] = []
+        self.last_boxes: list[np.ndarray] = []  # box (xyxy) of each entry in ``last``, same order
         self._end_gap = thr.lost_buffer_s + 0.5
 
     # ---------------------------------------------------------------------------------- stepping
@@ -76,6 +77,7 @@ class TrackManager:
         out = self.tracker.update(detections)
         confirmed = out[out.tracker_id >= 0] if len(out) else out
         self.last = []
+        self.last_boxes = []
         # Map tracker outputs back to our per-detection floor points / votes by box identity.
         if len(confirmed):
             idx = self._match_back(detections.xyxy, confirmed.xyxy)
@@ -92,6 +94,7 @@ class TrackManager:
                     self.by_id[tid] = live
                 live.add(t, floor_xy[j], bool(votes[j]))
                 self.last.append((live.uid, np.asarray(floor_xy[j], float), bool(votes[j])))
+                self.last_boxes.append(np.asarray(detections.xyxy[j], float))
         self._expire(t)
         return confirmed
 
