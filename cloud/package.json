@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Private StoreLens app on Cloudflare Workers: Access-checked dashboard + snapshot ingest",
+  "description": "Private Glance app on Cloudflare Workers: Access-checked dashboard + snapshot ingest",
   "scripts": {
     "test": "node --test test/*.test.js",
     "check": "wrangler deploy --dry-run --outdir .dryrun",

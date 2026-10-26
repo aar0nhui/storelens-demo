@@ -36,7 +36,7 @@ bucket, so it cannot be joined back to a visit or a path.
 **Demo caveat.** The demo's estimator is simulated: it is a noisy copy of the simulator's ground truth with illustrative
 accuracy, because rendered blobs have no faces. It shows the plumbing and the dashboard, not how well a camera can
 estimate age. No production model is bundled. A real estimator implements four methods (see `attributes.py`) and must be
-measured on the store's own footage with `storelens fieldcheck` before any audience number is shown.
+measured on the store's own footage with `glance fieldcheck` before any audience number is shown.
 
 ## Recommendations
 
@@ -68,7 +68,7 @@ business:
   purchase_rate_given_engaged: [0.05, 0.15]   # low and high share of engaged shoppers who buy
 ```
 
-**Traffic and marketing.** StoreLens has no data on how many people an advertisement brings through the door, so footfall
+**Traffic and marketing.** Glance has no data on how many people an advertisement brings through the door, so footfall
 effects appear only as sensitivity tables ("if marketing to this group raised its visits by 5%, 10% or 20%, the extra
 engaged shoppers and money would be about ..."). The total in the summary adds one layout scenario per display and assumes
 they do not affect each other.

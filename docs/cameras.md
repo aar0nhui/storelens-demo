@@ -30,7 +30,7 @@ appearance matching, which would be the "remember someone" capability the privac
 * Lift comparisons use a time-block bootstrap in multi-camera mode, since visitors are not independent samples across
   cameras.
 
-## `storelens cameras --config store.yaml [--png coverage.png] [--json out.json]`
+## `glance cameras --config store.yaml [--png coverage.png] [--json out.json]`
 
 For each camera: how well the calibration fits, how much of the floor the points cover, and pixels per metre. Then for the
 store: which camera owns each display, what share of the floor is seen by none, one or several cameras, and warnings.
@@ -47,8 +47,8 @@ store: which camera owns each display, what share of the floor is seen by none, 
 ## Process each camera, then analyse together
 
 ```bash
-storelens run --config store.yaml --camera door  --video door.mp4  --start 2026-11-14T10:00 --db store.db --label door
-storelens run --config store.yaml --camera floor --video floor.mp4 --start 2026-11-14T10:00 --db store.db --label floor
+glance run --config store.yaml --camera door  --video door.mp4  --start 2026-11-14T10:00 --db store.db --label door
+glance run --config store.yaml --camera floor --video floor.mp4 --start 2026-11-14T10:00 --db store.db --label floor
 ```
 
 Start times must agree (use the box's clock, synced by NTP, not the cameras' own). The Cameras card on the dashboard's Floor plan tab shows
@@ -59,5 +59,5 @@ different layout version.
 
 The on-site setup wizard (find cameras on the network, click calibration points on a live frame, draw masks, run a
 five-minute validation) is not built; it needs the real hardware. Until then, calibration points are entered in
-`store.yaml` and checked with `storelens cameras` and `storelens calibrate`. Credentials for RTSP streams stay on the store
+`store.yaml` and checked with `glance cameras` and `glance calibrate`. Credentials for RTSP streams stay on the store
 computer and never go to the cloud.

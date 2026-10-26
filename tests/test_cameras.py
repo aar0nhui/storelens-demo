@@ -2,10 +2,10 @@
 import numpy as np
 import pytest
 
-from storelens.cameras import CameraNetwork, calibration_report, suggest_detector_params
-from storelens.config import CameraConfig, StoreConfig
-from storelens.sim.layout import default_layout
-from storelens.sim.multicam import build_multicam_config
+from glance.cameras import CameraNetwork, calibration_report, suggest_detector_params
+from glance.config import CameraConfig, StoreConfig
+from glance.sim.layout import default_layout
+from glance.sim.multicam import build_multicam_config
 
 
 @pytest.fixture(scope="module")

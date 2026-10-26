@@ -2,8 +2,8 @@
 import numpy as np
 import supervision as sv
 
-from storelens.config import Thresholds
-from storelens.track import TrackManager
+from glance.config import Thresholds
+from glance.track import TrackManager
 
 PX = 50.0
 FPS = 10.0

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from storelens import cloudsync
-from storelens.config import load_config
+from glance import cloudsync
+from glance.config import load_config
 
 ROOT = Path(__file__).resolve().parents[1]
 CLOUD = ROOT / "cloud"
@@ -49,8 +49,8 @@ def test_real_snapshot_passes_the_worker_guard_and_round_trips(harness, envelope
     r = cloudsync.push(url, body, harness["client_id"], harness["client_secret"], retries=1)
     assert r["status"] == 200 and r["body"]["latest_updated"] is True
     status, js = _get(harness, "/data/snapshot.js", user="owner@example.com")
-    assert status == 200 and js.startswith("window.__STORELENS_SNAPSHOT__ = ")
-    got = json.loads(js[len("window.__STORELENS_SNAPSHOT__ = "):].rstrip().rstrip(";"))
+    assert status == 200 and js.startswith("window.__GLANCE_SNAPSHOT__ = ")
+    got = json.loads(js[len("window.__GLANCE_SNAPSHOT__ = "):].rstrip().rstrip(";"))
     assert set(got) == set(envelope["snapshot"])
 
 

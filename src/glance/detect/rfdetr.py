@@ -21,7 +21,7 @@ class RFDETRDetector(Detector):
         try:
             import rfdetr
         except ImportError as e:  # pragma: no cover
-            raise ImportError("pip install 'storelens[rfdetr]' to use the RF-DETR backend") from e
+            raise ImportError("pip install 'glance[rfdetr]' to use the RF-DETR backend") from e
         cls = {"nano": "RFDETRNano", "small": "RFDETRSmall", "base": "RFDETRBase"}[size]
         self.model = getattr(rfdetr, cls)()
         self.threshold, self.person = threshold, person_class_id

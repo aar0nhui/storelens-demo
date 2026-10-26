@@ -1,14 +1,14 @@
 """Demographics end to end on a short synthetic clip: simulated attribute model -> pipeline -> aggregate table -> audit."""
 import pytest
 
-from storelens.attributes import SimulatedEstimator
-from storelens.audit import attack_with_truth, file_scan, run_audit, schema_scan, store_exposure, time_check
-from storelens.pipeline import Pipeline
-from storelens.queries import Analytics, Window
-from storelens.sim.generate import Period, generate_period
-from storelens.sim.layout import build_store_config, default_layout
-from storelens.store import EventStore
-from storelens.validate import load_gt, validate
+from glance.attributes import SimulatedEstimator
+from glance.audit import attack_with_truth, file_scan, run_audit, schema_scan, store_exposure, time_check
+from glance.pipeline import Pipeline
+from glance.queries import Analytics, Window
+from glance.sim.generate import Period, generate_period
+from glance.sim.layout import build_store_config, default_layout
+from glance.store import EventStore
+from glance.validate import load_gt, validate
 
 pytestmark = pytest.mark.slow
 START = 1_800_000_000.0

@@ -55,7 +55,7 @@ class CameraConfig(BaseModel):
     # Zone ids this camera is responsible for. None = chosen automatically (best view of the zone).
     owns: list[str] | None = None
     # Per-camera detector tuning, merged over ``detector.params``. Pixel sizes differ between cameras, so e.g. the
-    # background-subtraction detector's ``typical_area`` must too: ``storelens cameras`` prints a suggestion.
+    # background-subtraction detector's ``typical_area`` must too: ``glance cameras`` prints a suggestion.
     detector_params: dict = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -109,7 +109,7 @@ class Thresholds(BaseModel):
     min_engage_s: float = 2.0  # stopped (AND facing, in stop_facing mode) this long => engaged impression
     # "stop":        engaged = stopped inside the exposure zone >= min_engage_s (the MVP default)
     # "stop_facing": additionally require facing the display. Needs a real orientation estimator
-    #                (pose/head); with motion-only heading it LOSES recall, see `storelens validate`.
+    #                (pose/head); with motion-only heading it LOSES recall, see `glance validate`.
     engagement_mode: Literal["stop", "stop_facing"] = "stop"
     min_zone_visit_s: float = 0.5
     zone_gap_merge_s: float = 3.0

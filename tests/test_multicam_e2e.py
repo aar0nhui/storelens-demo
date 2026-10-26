@@ -1,14 +1,14 @@
 """Two cameras, one floor plan: shoppers are counted once, and every display is measured by exactly one camera."""
 import pytest
 
-from storelens.cameras import CameraNetwork
-from storelens.pipeline import Pipeline
-from storelens.queries import Analytics, Window
-from storelens.sim.generate import Period
-from storelens.sim.layout import default_layout
-from storelens.sim.multicam import build_multicam_config, generate_multicam_period
-from storelens.store import EventStore
-from storelens.validate import gt_events, load_gt
+from glance.cameras import CameraNetwork
+from glance.pipeline import Pipeline
+from glance.queries import Analytics, Window
+from glance.sim.generate import Period
+from glance.sim.layout import default_layout
+from glance.sim.multicam import build_multicam_config, generate_multicam_period
+from glance.store import EventStore
+from glance.validate import gt_events, load_gt
 
 pytestmark = pytest.mark.slow
 START = 1_800_000_000.0

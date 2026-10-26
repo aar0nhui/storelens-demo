@@ -7,9 +7,9 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pytest
 
-from storelens.attributes import UNKNOWN, bucket_start
-from storelens.audit import (coarsen_audience, file_scan, run_audit, schema_scan, store_exposure, time_check, vacuum)
-from storelens.store import EventStore
+from glance.attributes import UNKNOWN, bucket_start
+from glance.audit import (coarsen_audience, file_scan, run_audit, schema_scan, store_exposure, time_check, vacuum)
+from glance.store import EventStore
 
 LA = ZoneInfo("America/Los_Angeles")
 DAY = datetime(2026, 11, 2, 0, 0, tzinfo=LA).timestamp()
@@ -152,4 +152,4 @@ def test_run_audit_what_if_does_not_touch_the_real_database(cfg, tmp_path):
     r = run_audit(_on(cfg), tmp_path / "a.db", data_dir=tmp_path, coarsen_days=7, now=DAY + 30 * 86400)
     assert r["what_if"]["rows_after"] <= r["what_if"]["rows_before"] and r["overall"] in ("PASS", "WARN")
     assert EventStore(tmp_path / "a.db").query("SELECT * FROM audience ORDER BY 1,2,3,4,5") == before
-    assert not list(tmp_path.glob("storelens-audit-*"))
+    assert not list(tmp_path.glob("glance-audit-*"))

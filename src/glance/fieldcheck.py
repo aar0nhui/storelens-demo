@@ -4,7 +4,7 @@ The simulator can only show that the logic works. Before a real number goes in f
 count by hand, on that store's footage, and this module turns those counts into error figures with confidence
 intervals and PASS / FAIL against thresholds written down BEFORE looking at the results.
 
-Inputs are small CSV files (see ``storelens fieldcheck --init``):
+Inputs are small CSV files (see ``glance fieldcheck --init``):
 
   door_tally   start,end,count_in            tally-clicker counts per window at the door
   crowd        t,people                      "how many customers are in view right now" at sampled instants
@@ -490,7 +490,7 @@ TEMPLATES = {
     "crowd.csv": "t,people\n# at each sampled instant (freeze the frame): how many CUSTOMERS are visible? exclude staff\n"
                  "2026-11-14T10:07:30,0\n",
     "stops.csv": "t_enter,t_exit,zone\n# every time someone stood still at a display for at least the engage threshold "
-                 "(see `storelens cameras`); label ALL of them inside the sampled stretch\n2026-11-14T10:12:05,2026-11-14T10:12:21,front_table\n",
+                 "(see `glance cameras`); label ALL of them inside the sampled stretch\n2026-11-14T10:12:05,2026-11-14T10:12:21,front_table\n",
     "walks.csv": "start,end,people\n# staged walks: volunteers enter through the door, one group per window, windows apart\n"
                  "2026-11-14T07:30,2026-11-14T07:34,3\n",
     "demo_labels.csv": "start,end,age_band,gender,count\n# a tally of everyone who entered in the window: apparent age band and "

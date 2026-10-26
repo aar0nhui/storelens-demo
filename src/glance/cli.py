@@ -1,4 +1,4 @@
-"""storelens command line: sim, run, validate, fieldcheck, audit, calibrate, cameras, serve, report, site, demo."""
+"""glance command line: sim, run, validate, fieldcheck, audit, calibrate, cameras, serve, report, site, demo."""
 from __future__ import annotations
 
 import argparse
@@ -264,12 +264,12 @@ def cmd_demo(a) -> int:
     (out / "validation.json").write_text(json.dumps(reports, indent=2, default=float))
     store.close()
     rep = build_report(str(db), ds["config"], str(out / "report.html"))
-    print(f"\nreport: {rep}\nlive dashboard: storelens serve --config {ds['config']} --db {db}")
+    print(f"\nreport: {rep}\nlive dashboard: glance serve --config {ds['config']} --db {db}")
     return 0
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="storelens", description="Privacy-first retail analytics on existing CCTV")
+    ap = argparse.ArgumentParser(prog="glance", description="Privacy-first retail analytics on existing CCTV")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("sim", help="generate a synthetic store dataset with ground truth")
@@ -281,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("run", help="process a video into events")
     p.add_argument("--config", required=True); p.add_argument("--video", required=True)
     p.add_argument("--start", required=True, help="wall-clock start of the video, ISO (store tz) or epoch")
-    p.add_argument("--db", default="storelens.db"); p.add_argument("--label"); p.add_argument("--camera")
+    p.add_argument("--db", default="glance.db"); p.add_argument("--label"); p.add_argument("--camera")
     p.add_argument("--preview", help="write an anonymised (obscured) preview video here")
     p.add_argument("--allow-raw-preview", action="store_true", help="only needed when privacy.blur is 'none'")
     p.add_argument("--detector", choices=["bgsub", "yolox_onnx", "rfdetr"]); p.add_argument("--model")

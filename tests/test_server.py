@@ -5,8 +5,8 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from storelens.config import dump_config
-from storelens.server import build_snapshot, create_app
+from glance.config import dump_config
+from glance.server import build_snapshot, create_app
 from tests.test_queries import FIX, T0, Builder, _populate
 
 import numpy as np
@@ -94,7 +94,7 @@ def test_dashboard_layout_sidebar_navigation_and_sections(client):
     ids = set(re.findall(r'id="([\w-]+)"', html))
     wanted = {m for m in re.findall(r"\$\('#([\w-]+)'\)", js) if not m.endswith("-")} - {"loadErr"}  # skip '#pane-' + name, and the error banner JS creates
     assert wanted <= ids, sorted(wanted - ids)
-    assert "storelens.sidebar" in js and "hashchange" in js
+    assert "glance.sidebar" in js and "hashchange" in js
     assert 'href="static/' in html or 'src="static/' in html  # relative URLs: also works when hosted under a sub-path
 
 
@@ -113,7 +113,7 @@ def chromium():
 def test_dashboard_renders_every_section_without_errors(client, chromium, live_dir, tmp_path):
     """Open the standalone report in a real browser: each section fills in, the sidebar jumps between them, the logo
     returns to Overview, a display can be drilled into, the sidebar collapses and remembers it, and nothing throws."""
-    from storelens.report import build_report
+    from glance.report import build_report
     out = build_report(client.db_path, client.cfg_path, str(tmp_path / "r.html"), str(live_dir))
     page = chromium.new_page(viewport={"width": 1280, "height": 860})
     problems = []
@@ -185,7 +185,7 @@ def test_live_endpoint_and_media_support_range_requests(client, live_dir):
 
 
 def test_report_embeds_the_clips_only_when_they_exist(client, live_dir, tmp_path):
-    from storelens.report import build_report
+    from glance.report import build_report
     plain = build_report(client.db_path, client.cfg_path, str(tmp_path / "a.html"), None)
     withlive = build_report(client.db_path, client.cfg_path, str(tmp_path / "b.html"), str(live_dir))
     assert "data:video/mp4;base64," not in open(plain).read()
