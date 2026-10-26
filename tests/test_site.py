@@ -7,7 +7,7 @@ import threading
 
 import pytest
 
-from storelens.site import build_site
+from glance.site import build_site
 from tests.test_server import chromium, client, live_dir  # noqa: F401  (fixtures shared with the API tests)
 
 LIMIT_FILE = 25 * 1024 * 1024  # Cloudflare Pages / Workers static assets: max size of one file
@@ -16,7 +16,7 @@ LIMIT_FILES = 20_000           # ... and files per deployment on the free plans
 
 def _snapshot(site):
     js = (site / "data" / "snapshot.js").read_text()
-    m = re.match(r"window\.__STORELENS_SNAPSHOT__ = (.*);\n", js)
+    m = re.match(r"window\.__GLANCE_SNAPSHOT__ = (.*);\n", js)
     return json.loads(m.group(1)), js
 
 
@@ -36,7 +36,7 @@ def test_site_layout_relative_urls_and_snapshot(client, live_dir, tmp_path):
     assert {"/api/config", "/api/runs", "/api/summary", "/api/zones", "/api/timeseries", "/api/insights"} <= set(snap)
     assert snap["/api/live"]["camera"] == "media/camera.mp4"  # relative path to a separate file, not base64
     assert "data:video" not in js
-    demo = json.loads(re.search(r"window\.__STORELENS_DEMO__ = (.*);\n", js).group(1))  # ASCII-escaped, so charset-proof
+    demo = json.loads(re.search(r"window\.__GLANCE_DEMO__ = (.*);\n", js).group(1))  # ASCII-escaped, so charset-proof
     assert demo == {"label": "Demo · simulated data", "ctaText": "Request a pilot", "ctaUrl": "https://example.org/form"}
     assert "nosniff" in (out / "_headers").read_text()
     assert (out / "robots.txt").read_text().strip().endswith("Allow: /")
@@ -46,7 +46,7 @@ def test_site_without_live_clips_has_no_media(client, tmp_path):
     out = tmp_path / "s"
     build_site(client.db_path, client.cfg_path, str(out))
     assert not (out / "media").exists() and "/api/live" not in _snapshot(out)[0]
-    assert "__STORELENS_DEMO__" not in _snapshot(out)[1]
+    assert "__GLANCE_DEMO__" not in _snapshot(out)[1]
 
 
 def test_rebuild_replaces_what_it_owns_and_keeps_the_rest(client, tmp_path):

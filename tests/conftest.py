@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from storelens.sim.layout import build_store_config, default_layout
+from glance.sim.layout import build_store_config, default_layout
 
 
 @pytest.fixture(scope="session")

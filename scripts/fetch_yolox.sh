@@ -5,4 +5,4 @@ mkdir -p weights
 curl -fL -o weights/yolox_nano.onnx \
   https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_nano.onnx
 echo "saved weights/yolox_nano.onnx"
-echo "run with:  storelens run --detector yolox_onnx --model weights/yolox_nano.onnx ..."
+echo "run with:  glance run --detector yolox_onnx --model weights/yolox_nano.onnx ..."

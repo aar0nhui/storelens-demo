@@ -1,7 +1,7 @@
 import numpy as np
 
-from storelens.geometry import Homography, angle_diff, points_in_polygon
-from storelens.sim.layout import build_store_config, cam_homography, default_layout
+from glance.geometry import Homography, angle_diff, points_in_polygon
+from glance.sim.layout import build_store_config, cam_homography, default_layout
 
 
 def test_homography_recovers_floor_points(cfg):

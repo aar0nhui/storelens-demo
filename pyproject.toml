@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "storelens"
+name = "glance"
 version = "0.1.0"
 description = "Privacy-first retail analytics on existing CCTV: footfall, display impressions, engagement, layout insights."
 readme = "README.md"
@@ -26,13 +26,13 @@ rfdetr = ["rfdetr"]                   # RF-DETR backend (Apache-2.0 for the base
 dev = ["pytest>=8", "httpx>=0.27", "playwright>=1.40"]
 
 [project.scripts]
-storelens = "storelens.cli:main"
+glance = "glance.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-storelens = ["web/*"]
+glance = ["web/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

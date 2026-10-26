@@ -5,8 +5,8 @@ import cv2
 import numpy as np
 import pytest
 
-from storelens.detect.bgsub import BackgroundSubtractionDetector
-from storelens.detect.yolox_onnx import _decode
+from glance.detect.bgsub import BackgroundSubtractionDetector
+from glance.detect.yolox_onnx import _decode
 
 
 def scene(people):
@@ -48,13 +48,13 @@ def test_yolox_decode_shapes_and_scaling():
     assert np.allclose(out[0, 1, :2], [8.0, 0])  # next cell along x: (0 + 1) * 8
 
 
-WEIGHTS = os.environ.get("STORELENS_YOLOX_ONNX", "")
+WEIGHTS = os.environ.get("GLANCE_YOLOX_ONNX", "")
 
 
-@pytest.mark.skipif(not (WEIGHTS and Path(WEIGHTS).exists()), reason="set STORELENS_YOLOX_ONNX to a yolox_nano.onnx path")
+@pytest.mark.skipif(not (WEIGHTS and Path(WEIGHTS).exists()), reason="set GLANCE_YOLOX_ONNX to a yolox_nano.onnx path")
 def test_yolox_onnx_finds_a_person():
     from skimage import data
-    from storelens.detect.yolox_onnx import YoloxOnnxDetector
+    from glance.detect.yolox_onnx import YoloxOnnxDetector
     img = cv2.cvtColor(data.astronaut(), cv2.COLOR_RGB2BGR)
     d = YoloxOnnxDetector(WEIGHTS, conf=0.3).detect(img)
     assert len(d) >= 1 and d.confidence.max() > 0.5

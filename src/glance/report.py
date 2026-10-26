@@ -20,6 +20,6 @@ def build_report(db_path: str, config_path: str, out_path: str, live_dir: str | 
     payload = json.dumps(snap, default=float).replace("</", "<\\/")
     html = html.replace('<link rel="stylesheet" href="static/style.css">', f"<style>\n{css}\n</style>")
     html = html.replace('<script src="static/app.js"></script>',
-                        f"<script>window.__STORELENS_SNAPSHOT__ = {payload};</script>\n<script>\n{js}\n</script>")
+                        f"<script>window.__GLANCE_SNAPSHOT__ = {payload};</script>\n<script>\n{js}\n</script>")
     Path(out_path).write_text(html, encoding="utf-8")
     return str(out_path)

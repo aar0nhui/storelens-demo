@@ -43,7 +43,7 @@ class YoloxOnnxDetector(Detector):
         try:
             import onnxruntime as ort
         except ImportError as e:  # pragma: no cover
-            raise ImportError("pip install 'storelens[onnx]' to use the YOLOX backend") from e
+            raise ImportError("pip install 'glance[onnx]' to use the YOLOX backend") from e
         self.sess = ort.InferenceSession(model_path, providers=providers or ["CPUExecutionProvider"])
         self.inp = self.sess.get_inputs()[0].name
         shape = self.sess.get_inputs()[0].shape

@@ -31,14 +31,14 @@ store computer, so the Worker needs no CPU-hungry code and stays on the free pla
    whole-host app (Cloudflare applies the more specific path first, but confirm it in the Access policy tester).
 6. **Build the app shell and redeploy**:
    ```bash
-   storelens site --private --out cloud/public     # app shell only: no data, no video clips
+   glance site --private --out cloud/public     # app shell only: no data, no video clips
    cd cloud && npx wrangler deploy
    ```
 7. **On the store computer**:
    ```bash
    export CF_ACCESS_CLIENT_ID=...  CF_ACCESS_CLIENT_SECRET=...      # keep with 600 permissions or in the OS keyring
-   storelens snapshot --config store.yaml --db store.db --store-id acme-la --out snapshot.json
-   storelens push --snapshot snapshot.json --url https://<app>/ingest [--dry-run]
+   glance snapshot --config store.yaml --db store.db --store-id acme-la --out snapshot.json
+   glance push --snapshot snapshot.json --url https://<app>/ingest [--dry-run]
    ```
    Run it from cron or a systemd timer after each processing batch. A push retries connection errors and server errors
    with backoff and stops on a 4xx (fix the cause). `--dry-run` shows what would be sent.

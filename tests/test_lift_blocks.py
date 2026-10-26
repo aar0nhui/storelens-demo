@@ -1,7 +1,7 @@
 """Lift with several cameras: the bootstrap resamples TIME BLOCKS (visitors cannot be linked across cameras)."""
 import numpy as np
 
-from storelens.queries import lift_stats
+from glance.queries import lift_stats
 
 IDS = ["a", "b", "c", "d"]
 NAMES = {i: i for i in IDS}

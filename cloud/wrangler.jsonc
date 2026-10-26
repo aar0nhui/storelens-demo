@@ -1,4 +1,4 @@
-// Private StoreLens app: the dashboard (static assets) + /ingest + /data, ALL behind Cloudflare Access.
+// Private Glance app: the dashboard (static assets) + /ingest + /data, ALL behind Cloudflare Access.
 // Deploy from this folder (`npx wrangler deploy`), never from the repo root: the root wrangler.jsonc is the PUBLIC demo.
 // Variables below are not secret. See README.md for the Access applications and the R2 bucket this needs.
 {

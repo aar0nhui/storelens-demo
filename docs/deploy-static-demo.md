@@ -26,11 +26,11 @@ site/                      10 files, 3.1 MB (largest: media/camera.mp4, 1.8 MB)
 
 ```bash
 pip install -e ".[dev]"
-make site                              # same as: storelens site --config demo_data/store.yaml --db demo_data/demo.db --out site
+make site                              # same as: glance site --config demo_data/store.yaml --db demo_data/demo.db --out site
 python -m http.server -d site 8000     # open http://localhost:8000
 ```
 
-Useful flags on `storelens site`: `--demo-label "Demo · simulated data"` (header chip, set by `make site`),
+Useful flags on `glance site`: `--demo-label "Demo · simulated data"` (header chip, set by `make site`),
 `--cta-url https://forms.gle/... --cta-text "Request a pilot"` (a header button for customer-discovery sign-ups; also
 accepts `mailto:`), and `--noindex` (asks search engines not to list it; this is not access control).
 
@@ -39,8 +39,8 @@ accepts `mailto:`), and `--noindex` (asks search engines not to list it; this is
 ```bash
 git init -b main
 git add .                              # .gitignore keeps raw simulated video, weights and caches out (7 MB tracked in total)
-git commit -m "StoreLens MVP + static demo"
-gh repo create storelens --public --source . --push     # or create it on github.com and `git push -u origin main`
+git commit -m "Glance MVP + static demo"
+gh repo create glance --public --source . --push     # or create it on github.com and `git push -u origin main`
 ```
 
 Rules for this repo: it may hold code, docs, the simulated `demo_data/` and the built `site/`. It must **never** hold real
@@ -68,7 +68,7 @@ request gets a preview deployment. (`wrangler.jsonc` is only used for local deve
 
 1. Change code or data, run `make site`, commit, push to `main`. Cloudflare redeploys automatically.
 2. New simulated data: `make demo-data` (a few minutes, writes ~150 MB of temporary video that is git-ignored), then `make site`.
-3. `.github/workflows/ci.yml` runs the tests and a trial `storelens site` build on every push and pull request. It does
+3. `.github/workflows/ci.yml` runs the tests and a trial `glance site` build on every push and pull request. It does
    not deploy; Cloudflare does that. (Written for GitHub Actions, not yet run on GitHub: check the action versions.)
 
 A custom domain is free on Pages (100 per project). On Workers, custom domains need the domain's DNS to be on Cloudflare.

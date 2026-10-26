@@ -6,11 +6,11 @@ import cv2
 import numpy as np
 import pytest
 
-from storelens import live as live_mod
-from storelens.live import FloorPanel, LiveState
-from storelens.sim import webcam
-from storelens.sim.layout import default_layout
-from storelens.sim.webcam import Camera, WebcamScene, _seg_hits_rect
+from glance import live as live_mod
+from glance.live import FloorPanel, LiveState
+from glance.sim import webcam
+from glance.sim.layout import default_layout
+from glance.sim.webcam import Camera, WebcamScene, _seg_hits_rect
 
 
 @pytest.fixture(scope="module")

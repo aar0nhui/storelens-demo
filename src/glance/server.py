@@ -42,7 +42,7 @@ def _parse_t(v: str | None) -> float | None:
 
 
 def find_live(db_path: str, live_dir: str | None = None) -> Path | None:
-    """The simulated live-view clips (``storelens live``): an explicit dir, else ``live/`` next to the database."""
+    """The simulated live-view clips (``glance live``): an explicit dir, else ``live/`` next to the database."""
     d = Path(live_dir) if live_dir else Path(db_path).resolve().parent / "live"
     return d if (d / "live.json").exists() and (d / "camera.mp4").exists() and (d / "floorplan.mp4").exists() else None
 
@@ -108,7 +108,7 @@ def build_snapshot(db_path: str, cfg: StoreConfig, live: Path | None = None) -> 
 
 def create_app(db_path: str, config_path: str, live_dir: str | None = None) -> FastAPI:
     cfg = load_config(config_path)
-    app = FastAPI(title="StoreLens", version="0.1.0")
+    app = FastAPI(title="Glance", version="0.1.0")
     live = find_live(db_path, live_dir)
 
     def analytics():

@@ -23,5 +23,5 @@ jobs:
           npx wrangler deploy --dry-run --outdir .dryrun
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest -m "not slow"
-      - run: storelens site --config demo_data/store.yaml --db demo_data/demo.db --out /tmp/site-check
-      - run: storelens site --private --out /tmp/private-check
+      - run: glance site --config demo_data/store.yaml --db demo_data/demo.db --out /tmp/site-check
+      - run: glance site --private --out /tmp/private-check

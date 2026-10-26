@@ -1,4 +1,4 @@
-/* StoreLens dashboard. Colours are tokens: chart series, status and surfaces each have their own role, and dark mode is
+/* Glance dashboard. Colours are tokens: chart series, status and surfaces each have their own role, and dark mode is
    its own set of steps (not an automatic flip). */
 :root {
   color-scheme: light;
