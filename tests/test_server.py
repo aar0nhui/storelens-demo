@@ -83,7 +83,7 @@ def test_dashboard_layout_sidebar_navigation_and_sections(client):
         assert needle in html, needle
     assert re.search(r'id="brand" href="#/overview"', html)  # logo + name go back to Overview
     tabs = re.findall(r'data-tab="(\w+)"', html)
-    assert tabs == ["overview", "floor", "activity", "audience", "recommend", "insights", "data"]
+    assert tabs == ["overview", "insights", "floor", "activity", "audience", "recommend", "data"]
     assert re.search(r"const TABS = \[([^\]]*)\]", js).group(1).replace("'", "").replace(" ", "").split(",") == tabs
     for t in tabs:
         assert f'id="pane-{t}"' in html and f'href="#/{t}"' in html and f'id="nav-{t}"' in html
@@ -131,7 +131,8 @@ def test_dashboard_renders_every_section_without_errors(client, chromium, live_d
         assert page.get_attribute(f"#nav-{t}", "aria-current") == "page"
     page.click("#brand")  # logo + name -> Overview
     page.wait_for_function("location.hash === '#/overview'")
-    assert page.is_visible("#pane-overview") and page.inner_text("#pageTitle") == "Overview"
+    page.wait_for_selector("#pane-overview", state="visible")  # the hashchange handler runs after the hash updates
+    assert page.inner_text("#pageTitle") == "Overview"
     page.click("#nav-floor")
     page.click("#zoneTable tr.zrow >> nth=0")  # drill into a display
     assert page.inner_text("#zoneDetail h2") != "Whole store"

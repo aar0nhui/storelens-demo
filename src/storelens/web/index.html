@@ -21,21 +21,21 @@
       <a class="nav-item" id="nav-overview" href="#/overview" data-tab="overview" title="Overview" aria-label="Overview">
         <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="5.5" height="5.5" rx="1.4"/><rect x="11.5" y="3" width="5.5" height="5.5" rx="1.4"/><rect x="3" y="11.5" width="5.5" height="5.5" rx="1.4"/><rect x="11.5" y="11.5" width="5.5" height="5.5" rx="1.4"/></svg>
         <span class="nav-t">Overview</span></a>
+      <a class="nav-item" id="nav-insights" href="#/insights" data-tab="insights" title="A/B test" aria-label="A/B test">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v14"/><rect x="3" y="9" width="4" height="7" rx="1"/><rect x="13" y="5" width="4" height="11" rx="1"/></svg>
+        <span class="nav-t">A/B test</span></a>
       <a class="nav-item" id="nav-floor" href="#/floor" data-tab="floor" title="Floor plan" aria-label="Floor plan">
         <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="12" rx="1.6"/><path d="M3 9.5h6.5M9.5 9.5V16M12.5 4v5.5H17"/></svg>
         <span class="nav-t">Floor plan</span></a>
-      <a class="nav-item" id="nav-activity" href="#/activity" data-tab="activity" title="Activity" aria-label="Activity">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 16.5V10M10 16.5V4M15.5 16.5v-4.5"/></svg>
-        <span class="nav-t">Activity</span></a>
+      <a class="nav-item" id="nav-activity" href="#/activity" data-tab="activity" title="Traffic" aria-label="Traffic">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 15.5l4-5 3 3 6.5-8"/><path d="M3 17h14"/></svg>
+        <span class="nav-t">Traffic</span></a>
       <a class="nav-item" id="nav-audience" href="#/audience" data-tab="audience" title="Audience" aria-label="Audience">
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="7" r="2.6"/><path d="M2.8 16c.4-2.9 2.3-4.4 4.7-4.4s4.3 1.5 4.7 4.4"/><circle cx="14" cy="8" r="2.1"/><path d="M13.6 11.8c2 .1 3.3 1.3 3.6 3.6"/></svg>
         <span class="nav-t">Audience</span></a>
       <a class="nav-item" id="nav-recommend" href="#/recommend" data-tab="recommend" title="Recommendations" aria-label="Recommendations">
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 15l4.8-4.8 3 3L16.5 8"/><path d="M12.2 8h4.3v4.3"/></svg>
-        <span class="nav-t">Recommendations</span></a>
-      <a class="nav-item" id="nav-insights" href="#/insights" data-tab="insights" title="Insights" aria-label="Insights">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.8 14.6h4.4M8.3 17h3.4M10 2.8a5 5 0 0 0-3 9c.6.5 1 1.1 1 2h4c0-.9.4-1.5 1-2a5 5 0 0 0-3-9z"/></svg>
-        <span class="nav-t">Insights</span></a>
+        <span class="nav-t">Recommendations</span></a>
       <a class="nav-item" id="nav-data" href="#/data" data-tab="data" title="Data &amp; privacy" aria-label="Data &amp; privacy">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.8l6 2.2v4.7c0 3.4-2.4 6-6 7.5-3.6-1.5-6-4.1-6-7.5V5l6-2.2z"/><path d="M7.4 10l1.8 1.8 3.4-3.6"/></svg>
         <span class="nav-t">Data &amp; privacy</span></a>
@@ -53,54 +53,83 @@
         <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-controls="side" aria-expanded="false" aria-label="Open menu" title="Menu">
           <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
-        <h1 class="page-title" id="pageTitle">Overview</h1>
-        <div class="store-id">
-          <span class="store-name" id="storeName"></span>
-          <span class="demo-chip" id="demoChip" hidden></span>
-          <span class="privacy-chip" title="No faces, frames or trajectories are stored. See Data &amp; privacy.">Anonymous · no faces stored</span>
+        <div class="title-block">
+          <h1 class="page-title" id="pageTitle">Overview</h1>
+          <div class="store-id"><span class="store-name" id="storeName"></span><span class="demo-chip" id="demoChip" hidden></span></div>
         </div>
-        <div class="controls"><label for="period">Period</label><select id="period"></select>
+        <div class="controls"><label for="period" class="sr-only">Period</label><select id="period"></select>
           <a class="cta" id="ctaLink" hidden target="_blank" rel="noopener noreferrer"></a></div>
       </div>
     </header>
 
     <main id="panes">
 
-      <!-- ------------------------------ Overview: key numbers + live view ------------------------------ -->
+      <!-- ------------------------------ Overview ------------------------------ -->
       <section class="pane" id="pane-overview" aria-label="Overview">
         <section class="kpis" id="kpis" aria-label="Key metrics"></section>
 
-        <section class="card live" id="liveCard" hidden aria-label="Simulated live view">
-          <div class="card-h">
-            <h2>Live view</h2>
-            <span class="live-badge"><i></i>Simulated</span>
-            <span class="sub" id="liveSub"></span>
-          </div>
-          <div class="live-grid">
-            <figure class="monitor"><video id="liveCam" muted playsinline loop preload="auto" aria-label="Simulated store camera feed"></video>
-              <figcaption>Store camera · heads blurred · tags are anonymous track ids</figcaption></figure>
-            <figure class="monitor"><video id="liveFp" muted playsinline loop preload="auto" aria-label="Live floor plan"></video>
-              <figcaption>Floor plan · same tracks · zones turn green while someone is engaged</figcaption></figure>
-          </div>
-          <div class="live-ctl">
-            <button id="livePlay" type="button" class="btn">Pause</button>
-            <input id="liveSeek" type="range" min="0" max="1000" value="0" aria-label="Seek">
-            <span id="liveTime" class="sub">0:00</span>
-            <select id="liveRate" aria-label="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
-          </div>
-          <p class="sub live-note" id="liveNote"></p>
+        <section class="ov-grid">
+          <section class="card live" id="liveCard" hidden aria-label="Simulated live view">
+            <div class="card-h">
+              <h2>Live view</h2>
+              <span class="live-badge" id="liveBadge"><i></i>Simulated feed</span>
+              <div class="chips"><span class="chip ok">People detected</span><span class="chip ok">Faces blurred</span><span class="chip ok">Anonymous IDs</span></div>
+            </div>
+            <div class="live-grid">
+              <figure class="monitor"><span class="mon-tag">Camera · vision layer</span><video id="liveCam" muted playsinline loop preload="auto" aria-label="Simulated store camera feed with detections"></video></figure>
+              <figure class="monitor"><span class="mon-tag">Floor plan · live</span><video id="liveFp" muted playsinline loop preload="auto" aria-label="Live floor plan"></video></figure>
+            </div>
+            <div class="live-ctl">
+              <button id="livePlay" type="button" class="btn">Pause</button>
+              <input id="liveSeek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+              <span id="liveTime" class="sub">0:00</span>
+              <select id="liveRate" aria-label="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+            </div>
+          </section>
+          <section class="card" id="ovTest" aria-label="A/B test result"></section>
+        </section>
+
+        <section class="grid-3">
+          <section class="card" id="ovPrize" aria-label="Biggest opportunities"></section>
+          <section class="card">
+            <div class="card-h"><h2>Display performance</h2><a class="more" href="#/floor">Floor plan →</a></div>
+            <div id="ovDisplays"></div>
+          </section>
+          <section class="card">
+            <div class="card-h"><h2>Audience mix</h2><a class="more" href="#/audience">Audience →</a></div>
+            <div id="ovAudience"></div>
+          </section>
         </section>
       </section>
 
-      <!-- ------------------------------ Floor plan: map, display detail, all displays ------------------------------ -->
+      <!-- ------------------------------ A/B test ------------------------------ -->
+      <section class="pane" id="pane-insights" aria-label="A/B test" hidden>
+        <section class="card" id="compareCard">
+          <div class="card-h">
+            <h2>Did the change work?</h2>
+            <div class="cmp-sel">
+              <label for="cmpA" class="tag-a">A</label><select id="cmpA" aria-label="Before"></select>
+              <span class="muted">vs</span>
+              <label for="cmpB" class="tag-b">B</label><select id="cmpB" aria-label="After"></select>
+            </div>
+          </div>
+          <div id="compare"></div>
+        </section>
+        <section class="card">
+          <div class="card-h"><h2>What the data says</h2></div>
+          <div id="insights" class="insights"></div>
+        </section>
+      </section>
+
+      <!-- ------------------------------ Floor plan ------------------------------ -->
       <section class="pane" id="pane-floor" aria-label="Floor plan" hidden>
         <section class="grid-wide">
           <div class="card" data-floor="fp">
             <div class="card-h">
               <h2>Floor plan</h2>
               <div class="seg" role="group" aria-label="Floor plan view">
-                <button type="button" data-m="traffic" class="on">Traffic heat</button>
-                <button type="button" data-m="engaged">Engaged / 100 visitors</button>
+                <button type="button" data-m="traffic" class="on">Traffic</button>
+                <button type="button" data-m="engaged">Engagement</button>
               </div>
             </div>
             <div class="canvas-wrap"><canvas class="floor" aria-label="Floor plan heatmap"></canvas><div class="tip" hidden></div></div>
@@ -109,121 +138,99 @@
           <div class="card" id="zoneDetail" aria-live="polite"></div>
         </section>
         <section class="card">
-          <div class="card-h"><h2>All displays</h2><span class="sub">ranked by engaged visitors per 100 visitors · click a row for detail</span></div>
+          <div class="card-h"><h2>All displays</h2><span class="sub">click a row to focus</span></div>
           <div id="zoneTable"></div>
+        </section>
+      </section>
+
+      <!-- ------------------------------ Traffic ------------------------------ -->
+      <section class="pane" id="pane-activity" aria-label="Traffic" hidden>
+        <section class="kpis kpis-sm" id="actStats" aria-label="Traffic highlights"></section>
+        <section class="grid-wide">
+          <div class="card">
+            <div class="card-h">
+              <h2>Over time</h2>
+              <div class="cmp-sel"><label for="seriesZone" class="sr-only">Display</label><select id="seriesZone"></select></div>
+            </div>
+            <div id="series"></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h2>Top paths</h2></div>
+            <div id="flows"></div>
+          </div>
+        </section>
+      </section>
+
+      <!-- ------------------------------ Audience ------------------------------ -->
+      <section class="pane" id="pane-audience" aria-label="Audience" hidden>
+        <div id="audOff" class="card" hidden></div>
+        <div id="audBody" class="pane-inner">
+          <section class="kpis kpis-sm" id="audStats" aria-label="Audience highlights"></section>
+          <section class="grid-2">
+            <section class="card"><div class="card-h"><h2>Age</h2><span class="sub" id="audCoverage"></span></div><div id="audAge"></div></section>
+            <section class="card"><div class="card-h"><h2>Perceived gender</h2></div><div id="audGender"></div><div id="audMatrix"></div></section>
+          </section>
+          <section class="grid-wide">
+            <section class="card">
+              <div class="card-h"><h2>Who each display attracts</h2><div class="div-key" aria-hidden="true"><span>fewer</span><i></i><span>more than average</span></div></div>
+              <div id="audZones"></div>
+            </section>
+            <section class="card">
+              <div class="card-h"><h2>Standouts</h2></div>
+              <div id="audHighlights"></div>
+            </section>
+          </section>
+          <ul class="footnotes" id="audNotes"></ul>
+        </div>
+      </section>
+
+      <!-- ------------------------------ Recommendations ------------------------------ -->
+      <section class="pane" id="pane-recommend" aria-label="Recommendations" hidden>
+        <section class="card prize" id="recAssume">
+          <div id="recHero"></div>
+          <div class="assume" id="assumeForm"></div>
+        </section>
+        <section class="grid-wide" id="recMapWrap" hidden>
+          <div class="card"><div class="card-h"><h2>Suggested moves</h2><span class="sub" id="recMapSub"></span></div><div id="recMap"></div></div>
+          <div class="card"><div class="card-h"><h2>Order of play</h2></div><ol class="plan" id="recPlan"></ol></div>
+        </section>
+        <section class="sec">
+          <div class="sec-h"><h2>Layout changes</h2><span class="sub">ranked by value</span><span class="key" style="margin:0 0 0 auto"><span><i style="background:var(--orange)"></i>the gap</span><span><i class="dash"></i>store median</span></span></div>
+          <div id="recList" class="recs"></div>
+        </section>
+        <section class="sec">
+          <div class="sec-h"><h2>Target the audience you have</h2><span class="chip">sensitivity, not forecast</span></div>
+          <div id="recMkt" class="recs"></div>
+        </section>
+        <details class="card fine"><summary>How these estimates work</summary><ul class="q-list q-warn" id="recCaveats"></ul></details>
+      </section>
+
+      <!-- ------------------------------ Data quality, privacy, definitions ------------------------------ -->
+      <section class="pane" id="pane-data" aria-label="Data and privacy" hidden>
+        <section class="card" id="qualityCard">
+          <div class="card-h"><h2>Privacy by design</h2></div>
+          <div id="quality"></div>
         </section>
         <section class="card" id="camCard">
           <div class="card-h"><h2>Cameras &amp; coverage</h2><span class="sub" id="camSub"></span></div>
           <div class="cam-grid"><div id="camMap"></div><div id="camList"></div></div>
           <ul class="q-list q-warn" id="camWarn"></ul>
         </section>
-      </section>
-
-      <!-- (cameras & coverage is part of the floor plan section) -->
-      <!-- ------------------------------ Activity over time ------------------------------ -->
-      <section class="pane" id="pane-activity" aria-label="Activity" hidden>
-        <section class="grid-wide">
-          <div class="card">
-            <div class="card-h">
-              <h2>Activity over time</h2>
-              <div class="cmp-sel"><label for="seriesZone">Show</label><select id="seriesZone"></select></div>
-            </div>
-            <div class="sub" id="seriesSub"></div>
-            <div id="series"></div>
-          </div>
-          <div class="card">
-            <div class="card-h"><h2>Where people go next</h2><span class="sub">most common display-to-display moves</span></div>
-            <div id="flows"></div>
-          </div>
-        </section>
-      </section>
-
-      <!-- ------------------------------ Audience: who visits, who engages ------------------------------ -->
-      <section class="pane" id="pane-audience" aria-label="Audience" hidden>
-        <div id="audOff" class="card" hidden></div>
-        <div id="audBody" class="pane-inner">
-          <section class="card">
-            <div class="card-h"><h2>Who visits</h2><span class="sub" id="audCoverage"></span></div>
-            <div class="aud-store">
-              <div><div class="mini-h">Age</div><div id="audAge"></div></div>
-              <div><div class="mini-h">Perceived gender</div><div id="audGender"></div><div id="audMatrix"></div></div>
-            </div>
-            <ul class="q-list q-warn aud-notes" id="audNotes"></ul>
-          </section>
-          <section class="card">
-            <div class="card-h"><h2>Standout groups</h2><span class="sub">who is over- or under-represented among the people who engage with a display, compared with all visitors</span></div>
-            <div id="audHighlights" class="insights"></div>
-          </section>
-          <section class="card">
-            <div class="card-h"><h2>Who engages with each display</h2><span class="sub">bar = share of the people engaging · tick = share of all visitors · index = bar ÷ tick</span></div>
-            <div id="audZones" class="aud-zones"></div>
-          </section>
-        </div>
-      </section>
-
-      <!-- ------------------------------ Recommendations: how to lay out the store, with what-if estimates ------------------------------ -->
-      <section class="pane" id="pane-recommend" aria-label="Recommendations" hidden>
-        <section class="card" id="recAssume">
-          <div class="card-h"><h2>Your numbers</h2><span class="sub">StoreLens measures reach and stopping. These three inputs are assumptions: change them to your own and every estimate below updates.</span></div>
-          <div class="assume" id="assumeForm"></div>
-        </section>
-        <section class="card" id="recHero" hidden></section>
-        <section class="grid-wide" id="recMapWrap" hidden>
-          <div class="card"><div class="card-h"><h2>Suggested floor changes</h2><span class="sub" id="recMapSub"></span></div><div id="recMap"></div></div>
-          <div class="card"><div class="card-h"><h2>Order of play</h2></div><ol class="plan" id="recPlan"></ol></div>
-        </section>
-        <section class="card">
-          <div class="card-h"><h2>What to change</h2><span class="sub">scenarios from your own store's medians, ranked by estimated value</span></div>
-          <div id="recList" class="recs"></div>
-        </section>
-        <section class="card">
-          <div class="card-h"><h2>Marketing to the audience you already have</h2><span class="sub">sensitivity tables, not forecasts</span></div>
-          <div id="recMkt" class="recs"></div>
-        </section>
-        <section class="card"><div class="card-h"><h2>How to read these numbers</h2></div><ul class="q-list q-warn" id="recCaveats"></ul></section>
-      </section>
-
-      <!-- ------------------------------ Insights ------------------------------ -->
-      <section class="pane" id="pane-insights" aria-label="Insights" hidden>
-        <section class="card">
-          <div class="card-h"><h2>Layout insights</h2><span class="sub">rule-based; every card shows its numbers and a confidence level</span></div>
-          <div id="insights" class="insights"></div>
-        </section>
-        <section class="card" id="compareCard">
-          <div class="card-h">
-            <h2>Did the change work?</h2>
-            <div class="cmp-sel">
-              <label for="cmpA">Before</label><select id="cmpA"></select>
-              <label for="cmpB">After</label><select id="cmpB"></select>
-            </div>
-          </div>
-          <div id="compare"></div>
-        </section>
-      </section>
-
-      <!-- ------------------------------ Data quality, privacy, definitions ------------------------------ -->
-      <section class="pane" id="pane-data" aria-label="Data and privacy" hidden>
-        <section class="card" id="qualityCard">
-          <div class="card-h"><h2>Data quality &amp; privacy</h2></div>
-          <div id="quality"></div>
-        </section>
-        <section class="card">
-          <div class="card-h"><h2>Metric definitions</h2></div>
+        <details class="card fine">
+          <summary>Metric definitions</summary>
           <dl class="defs">
-            <dt>Visitors</dt><dd>Anonymous customer visits tracked in the period (staff excluded).</dd>
-            <dt>Impression</dt><dd>A visitor came inside a display's exposure zone (an <i>opportunity to see</i>).</dd>
-            <dt>Engaged</dt><dd>An impression where the visitor stopped in the zone long enough (default 2 s). In <code>stop_facing</code> mode they must also face the display.</dd>
-            <dt>Visitors who engaged</dt><dd>Share of all visitors who engaged with at least one display.</dd>
-            <dt>Median engaged time</dt><dd>Typical time an engaged visitor spent stopped at a display.</dd>
-            <dt>Reach</dt><dd>Impressions ÷ visitors. How many people come near the display.</dd>
-            <dt>Engagement rate</dt><dd>Engaged ÷ impressions. How compelling the display is once people are near it.</dd>
-            <dt>Engaged / 100</dt><dd>Engaged ÷ visitors × 100. Traffic-normalised, so a busy day doesn't flatter a display.</dd>
-            <dt>Age band / perceived gender</dt><dd>Estimates from appearance, counted in aggregate only. <i>Perceived gender</i> is what a model infers, not a fact about anyone. Groups under the minimum size are merged or hidden.</dd>
-            <dt>Index</dt><dd>A group's share of the people engaging with a display ÷ its share of all visitors. 1.0 = in line; 1.5 = over-represented by half.</dd>
-            <dt>Scenario</dt><dd>"If this display reached as many visitors (or held as many) as your median display". A benchmark from your own store, not a forecast.</dd>
-            <dt>Estimated sales</dt><dd>Extra engaged shoppers × the share who buy × basket size. The last two are your assumptions.</dd>
+            <dt>Visitors</dt><dd>Anonymous customer visits in the period (staff excluded).</dd>
+            <dt>Impression</dt><dd>A visitor came inside a display's exposure zone: an opportunity to see it.</dd>
+            <dt>Engaged</dt><dd>An impression where the visitor stopped in the zone for at least 2 s (in <code>stop_facing</code> mode, also facing it).</dd>
+            <dt>Reach</dt><dd>Impressions ÷ visitors: how many people come near a display.</dd>
+            <dt>Stop rate</dt><dd>Engaged ÷ impressions: how compelling a display is once people are near it.</dd>
+            <dt>Engaged / 100</dt><dd>Engaged ÷ visitors × 100. Traffic-normalised, so a busy day doesn't flatter a display. Used for A/B tests.</dd>
+            <dt>Lift</dt><dd>Change in engaged / 100 between two periods, adjusted for store-wide shifts, with a confidence interval.</dd>
+            <dt>Age band / perceived gender</dt><dd>Estimates from appearance, counted in aggregate only. Groups under the minimum size are merged or hidden.</dd>
+            <dt>Index</dt><dd>A group's share of a display's engaged people ÷ its share of all visitors. 1.0× = in line.</dd>
+            <dt>Scenario</dt><dd>"If this display matched your median display". A benchmark from your own store, not a forecast.</dd>
           </dl>
-        </section>
+        </details>
       </section>
 
     </main>
