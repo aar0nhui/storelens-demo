@@ -46,6 +46,20 @@
     set(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* ignore */ } },
   };
 
+  // ---- light / dark. Both palettes are token sets in style.css, keyed off data-theme on <html>; with nothing stored
+  // we follow the operating system, which is what the dashboard did before the toggle existed. Applied here, at script
+  // time rather than from init(), so the page is never painted in the wrong theme first.
+  const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const theme = {
+    stored: () => { const v = prefs.get('storelens.theme'); return v === 'light' || v === 'dark' ? v : null; },
+    now: () => theme.stored() || (mqDark.matches ? 'dark' : 'light'),
+    apply() {
+      const v = theme.stored();
+      if (v) document.documentElement.setAttribute('data-theme', v); else document.documentElement.removeAttribute('data-theme');
+    },
+  };
+  theme.apply();
+
   // ---- formatting
   const ok = (x) => x !== null && x !== undefined && isFinite(x);
   const pct = (x, d = 0) => (ok(x) ? (x * 100).toFixed(d) + '%' : '–');
@@ -112,6 +126,22 @@
     scrim.addEventListener('click', closeDrawer);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && app.classList.contains('drawer-open')) { closeDrawer(); menu.focus(); } });
     mqMobile.addEventListener('change', () => { app.classList.remove('drawer-open'); sync(); });
+    sync();
+  }
+
+  // ------------------------------------------------------------------------------------ theme toggle
+  function setupTheme() {
+    const btn = $('#themeBtn');
+    const sync = () => {
+      const dark = theme.now() === 'dark';
+      const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+      btn.classList.toggle('is-dark', dark);          // which icon shows: the mode the button switches to
+      btn.setAttribute('aria-label', label); btn.title = label;
+    };
+    // charts and the floor-plan canvas read the colour tokens when they draw, so a switch means redrawing them
+    const restyle = () => { sync(); markDirty(); paint(state.tab); };
+    btn.addEventListener('click', () => { prefs.set('storelens.theme', theme.now() === 'dark' ? 'light' : 'dark'); theme.apply(); restyle(); });
+    mqDark.addEventListener('change', () => { theme.apply(); restyle(); });  // only visible while nothing is stored
     sync();
   }
 
@@ -189,6 +219,7 @@
   // ------------------------------------------------------------------------------------ boot
   async function init() {
     setupSidebar();
+    setupTheme();
     try {
       [state.cfg, state.runs, state.cams] = await Promise.all([api('/api/config'), api('/api/runs'), api('/api/cameras').catch(() => null)]);
     } catch (e) { $('#panes').prepend(h('div', { class: 'empty' }, 'Could not load data: ' + e.message)); return; }
@@ -229,7 +260,6 @@
     const onSize = (w) => { if (Math.abs(w - lastW) < 1) return; lastW = w; clearTimeout(rt); rt = setTimeout(redraw, 100); };
     if ('ResizeObserver' in window) new ResizeObserver((es) => onSize(es[0].contentRect.width)).observe($('#panes'));
     else window.addEventListener('resize', () => onSize(window.innerWidth));
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { markDirty(); paint(state.tab); });
 
     await load();
     initLive();
