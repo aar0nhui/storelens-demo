@@ -110,3 +110,47 @@ def test_site_works_in_a_browser_under_a_sub_path_with_its_csp(client, chromium,
         srv.shutdown()
     assert all(u.startswith(base) or u.startswith("data:") for u in requested), [u for u in requested if not u.startswith(base)]
     assert not problems, problems
+
+
+def test_dark_mode_toggle(client, chromium, tmp_path):  # noqa: F811
+    """Light mode is the default look. The toggle switches to dark, remembers the choice across a reload, redraws the
+    floor-plan canvas in the new palette, and switching back restores the light look exactly. Served over HTTP with the
+    site's own CSP, which forbids inline script: the theme has to be applied by static/app.js."""
+    root = tmp_path / "www"
+    build_site(client.db_path, client.cfg_path, str(root))
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+    handler.log_message = lambda *a, **k: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    page = chromium.new_page(viewport={"width": 1280, "height": 860})
+    problems = []
+    page.on("pageerror", lambda e: problems.append(str(e)))
+    page.on("console", lambda m: problems.append(m.text) if m.type == "error" else None)
+    theme = lambda: page.evaluate("document.documentElement.getAttribute('data-theme')")  # noqa: E731
+    bg = lambda: page.evaluate("getComputedStyle(document.body).backgroundColor")  # noqa: E731
+    try:
+        page.goto(base + "/#/floor")
+        page.wait_for_selector("#zoneTable tr.zrow")
+        # nothing stored yet: no override, so the stylesheet follows the operating system (headless chromium = light)
+        assert theme() is None
+        light_bg, light_floor = bg(), page.evaluate("document.querySelector('canvas.floor').toDataURL()")
+        assert page.get_attribute("#themeBtn", "aria-label") == "Switch to dark mode"
+
+        page.click("#themeBtn")
+        assert theme() == "dark" and bg() != light_bg
+        assert page.get_attribute("#themeBtn", "aria-label") == "Switch to light mode"
+        dark_floor = page.evaluate("document.querySelector('canvas.floor').toDataURL()")
+        assert dark_floor != light_floor, "the floor plan kept its light-mode colours"
+
+        page.reload()  # the choice sticks
+        page.wait_for_selector("#zoneTable tr.zrow")
+        assert theme() == "dark"
+
+        page.click("#themeBtn")  # ... and back to exactly the light look
+        assert theme() == "light" and bg() == light_bg
+        assert page.evaluate("document.querySelector('canvas.floor').toDataURL()") == light_floor
+    finally:
+        page.close()
+        srv.shutdown()
+    assert not problems, problems

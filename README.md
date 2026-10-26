@@ -192,7 +192,8 @@ run above shows what the same system says when the draw is small.
 `storelens serve`, the standalone `report.html` and the static site all show the same dashboard (offline, no external
 requests). A **collapsible sidebar** jumps between sections; clicking the StoreLens logo or name returns to Overview. It
 collapses to an icon rail (names appear as tooltips), remembers the choice in the browser, and on a phone becomes a
-drawer behind a menu button.
+drawer behind a menu button. A **light/dark toggle** sits in the top bar: until it is used the dashboard follows the
+operating system, and a click pins light or dark for that browser.
 
 * **Overview**: the four headline numbers (visitors, display impressions, visitors who engaged, median engaged time)
   and the simulated live view (store camera + live floor plan, in sync).

@@ -91,6 +91,10 @@ code { font-size: 12.5px; background: var(--soft); padding: 1px 5px; border-radi
 .cta { background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 7px 13px; border-radius: 9px; white-space: nowrap; }
 .cta:hover { filter: brightness(1.08); }
 .cta[hidden] { display: none; }
+/* light/dark toggle: the icon shows the mode it switches *to* (a moon while light, a sun while dark) */
+.theme-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.theme-btn .ico-sun, .theme-btn.is-dark .ico-moon { display: none; }
+.theme-btn.is-dark .ico-sun { display: block; }
 
 /* ---- panes & cards */
 main { padding: 20px 28px 48px; }

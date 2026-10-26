@@ -4,8 +4,8 @@ Goal: a public URL anyone can open, updated by pushing to GitHub. No server, no 
 
 The demo is the same dashboard you run locally, frozen on **simulated** data: every default view is precomputed into
 `site/data/snapshot.js`, and the two live-view clips are plain MP4 files. Nothing is requested from any other domain,
-nothing is stored in the browser except the sidebar open/closed preference, and the page ships with a strict
-Content-Security-Policy.
+nothing is stored in the browser except the sidebar open/closed preference and the light/dark choice, and the page
+ships with a strict Content-Security-Policy.
 
 ## 1. What gets deployed
 

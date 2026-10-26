@@ -59,7 +59,12 @@
           <h1 class="page-title" id="pageTitle">Overview</h1>
           <div class="store-id"><span class="store-name" id="storeName"></span><span class="demo-chip" id="demoChip" hidden></span></div>
         </div>
-        <div class="controls"><label for="period" class="sr-only">Period</label><select id="period"></select>
+        <div class="controls">
+          <button class="icon-btn theme-btn" id="themeBtn" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+            <svg class="ico-moon" viewBox="0 0 20 20" aria-hidden="true"><path d="M17.5 10.66A7.5 7.5 0 1 1 9.34 2.5 5.83 5.83 0 0 0 17.5 10.66z"/></svg>
+            <svg class="ico-sun" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 2.2v1.6M10 16.2v1.6M2.2 10h1.6M16.2 10h1.6M4.6 4.6l1.15 1.15M14.25 14.25l1.15 1.15M15.4 4.6l-1.15 1.15M5.75 14.25l-1.15 1.15"/></svg>
+          </button>
+          <label for="period" class="sr-only">Period</label><select id="period"></select>
           <a class="cta" id="ctaLink" hidden target="_blank" rel="noopener noreferrer"></a></div>
       </div>
     </header>
