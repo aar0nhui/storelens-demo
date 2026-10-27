@@ -14,18 +14,18 @@ test-all:        ## everything: fast tests, the slow video tests, the Worker tes
 cloud-test:      ## private-app Worker tests (needs Node 20+ and `npm ci` in cloud/)
 	cd cloud && npm test
 
-fieldcheck-example: ## worked example of `glance fieldcheck` from a demo folder (FROM=demo_out)
+fieldcheck-example: ## worked example of `storelens fieldcheck` from a demo folder (FROM=demo_out)
 	scripts/run_fieldcheck_example.sh $(or $(FROM),demo_out) examples/fieldcheck
 
 backtest:        ## internal-consistency check of the recommender on simulated worlds
 	python scripts/backtest_recommender.py
 
 site:            ## rebuild ./site from $(DEMO); commit the result to publish it
-	glance site --config $(DEMO)/store.yaml --db $(DEMO)/demo.db --out site --demo-label "$(LABEL)"
+	storelens site --config $(DEMO)/store.yaml --db $(DEMO)/demo.db --out site --demo-label "$(LABEL)"
 
 serve:           ## live dashboard (API mode) on http://127.0.0.1:8000
-	glance serve --config $(DEMO)/store.yaml --db $(DEMO)/demo.db
+	storelens serve --config $(DEMO)/store.yaml --db $(DEMO)/demo.db
 
 demo-data:       ## regenerate $(DEMO) from scratch: simulate + run the pipeline (several minutes, ~150 MB of temp video)
-	glance demo --out demo_out --minutes 90
+	storelens demo --out demo_out --minutes 90
 	cp demo_out/store.yaml demo_out/demo.db $(DEMO)/ && cp demo_out/live/* $(DEMO)/live/

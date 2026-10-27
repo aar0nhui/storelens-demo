@@ -5,10 +5,10 @@ import numpy as np
 import pytest
 import yaml
 
-from glance.fieldcheck import (DEFAULT_GATES, check_empty, gates_digest, judge, load_spec, parse_time, read_rows,
+from storelens.fieldcheck import (DEFAULT_GATES, check_empty, gates_digest, judge, load_spec, parse_time, read_rows,
                                   run_fieldcheck, worst, write_templates)
-from glance.queries import Analytics, Window
-from glance.store import EventStore
+from storelens.queries import Analytics, Window
+from storelens.store import EventStore
 
 from .test_queries import T0, Builder
 

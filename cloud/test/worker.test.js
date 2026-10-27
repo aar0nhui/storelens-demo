@@ -94,14 +94,14 @@ test("ingest stores history and latest; the dashboard then reads it back as a sc
   assert.match(js.headers.get("content-type"), /javascript/);
   assert.equal(js.headers.get("cache-control"), "private, no-store");
   const text = await js.text();
-  assert.match(text, /^window\.__GLANCE_SNAPSHOT__ = \{"\/api\/summary":\{"visitors":12\}/);
+  assert.match(text, /^window\.__STORELENS_SNAPSHOT__ = \{"\/api\/summary":\{"visitors":12\}/);
   const meta = await (await worker.fetch(req("/data/meta.json", { token: await userTok({}) }), env)).json();
   assert.equal(meta.has_data, true);
 });
 
 test("before any data arrives the dashboard gets an explicit empty marker", async () => {
   const js = await (await worker.fetch(req("/data/snapshot.js", { token: await userTok({}) }), makeEnv())).text();
-  assert.equal(js.trim(), 'window.__GLANCE_SNAPSHOT__ = {"__empty__":true};');
+  assert.equal(js.trim(), 'window.__STORELENS_SNAPSHOT__ = {"__empty__":true};');
 });
 
 test("an older snapshot is kept in history but does not replace the latest", async () => {

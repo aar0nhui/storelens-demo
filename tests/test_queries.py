@@ -4,10 +4,10 @@ import copy
 import numpy as np
 import pytest
 
-from glance.analysis import ZoneVisit
-from glance.insights import generate_insights
-from glance.queries import Analytics, Window
-from glance.store import EventStore
+from storelens.analysis import ZoneVisit
+from storelens.insights import generate_insights
+from storelens.queries import Analytics, Window
+from storelens.store import EventStore
 
 T0 = 1_800_000_000.0
 FIX = ["front_table", "wall_a", "gondola_c", "endcap_b", "back_promo"]
@@ -290,7 +290,7 @@ def test_a_big_change_to_one_display_does_not_make_its_neighbours_look_worse(cfg
 
 def test_no_change_anywhere_rarely_flags_a_winner_or_loser():
     """Five displays, no real change: the chance that ANY display gets a verdict should stay near 5%, not 23%."""
-    from glance.queries import lift_stats
+    from storelens.queries import lift_stats
     rng = np.random.default_rng(2)
     ids = FIX
     flagged = 0
@@ -305,6 +305,6 @@ def test_no_change_anywhere_rarely_flags_a_winner_or_loser():
 
 
 def test_visitors_needed_matches_textbook_two_proportion_sample_size():
-    from glance.queries import _visitors_needed
+    from storelens.queries import _visitors_needed
     assert 300 <= _visitors_needed(0.104, 0.181) <= 340   # worked example: ~320 per arm
     assert _visitors_needed(0.1, 0.1) is None and _visitors_needed(0.0, 0.2) is None

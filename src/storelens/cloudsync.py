@@ -82,7 +82,7 @@ def push(url: str, body: bytes, client_id: str | None = None, client_secret: str
         raise ValueError("the ingest URL must be https:// (plain http only for localhost tests)")
     req = urllib.request.Request(url, data=body, method="POST", headers={
         "Content-Type": "application/json", "CF-Access-Client-Id": client_id, "CF-Access-Client-Secret": client_secret,
-        "User-Agent": "glance-push/1"})
+        "User-Agent": "storelens-push/1"})
     last = ""
     for attempt in range(retries):
         try:

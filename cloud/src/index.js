@@ -1,4 +1,4 @@
-// Glance private app. Routes (every one needs a valid Cloudflare Access JWT, checked here and not only at the edge):
+// StoreLens private app. Routes (every one needs a valid Cloudflare Access JWT, checked here and not only at the edge):
 //   POST /ingest             store's computer -> snapshot JSON (service token)         -> R2
 //   GET  /data/snapshot.js   dashboard data as the script the app already loads    (e-mail login)
 //   GET  /data/meta.json     when the data was generated
@@ -75,7 +75,7 @@ async function data(request, env, url) {
   const obj = await env.SNAPSHOTS.get(key);
   // The page treats {"__empty__":true} as "nothing has arrived yet" and says so instead of showing broken charts.
   const snap = obj ? await obj.text() : '{"__empty__":true}';
-  return withHeaders(new Response(`window.__GLANCE_SNAPSHOT__ = ${snap};\n`, {
+  return withHeaders(new Response(`window.__STORELENS_SNAPSHOT__ = ${snap};\n`, {
     headers: { "Content-Type": "application/javascript; charset=utf-8" } }));
 }
 

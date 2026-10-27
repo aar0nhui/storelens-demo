@@ -2,8 +2,8 @@
 import numpy as np
 import pytest
 
-from glance.queries import Analytics, Window
-from glance.recommend import recommend
+from storelens.queries import Analytics, Window
+from storelens.recommend import recommend
 
 from .test_queries import FIX, T0, Builder
 

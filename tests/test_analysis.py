@@ -3,7 +3,7 @@ import math
 
 import numpy as np
 
-from glance.analysis import MotionFacing, analyze_samples, entry_crossings, is_engaged
+from storelens.analysis import MotionFacing, analyze_samples, entry_crossings, is_engaged
 from tests.conftest import make_traj
 
 

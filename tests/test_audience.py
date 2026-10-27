@@ -5,9 +5,9 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pytest
 
-from glance.attributes import (UNKNOWN, AudienceCounter, Estimate, NullEstimator, SimulatedEstimator,
+from storelens.attributes import (UNKNOWN, AudienceCounter, Estimate, NullEstimator, SimulatedEstimator,
                                   bucket_start, make_estimator)
-from glance.audience import band_label, index_ci, merge_groups, wilson
+from storelens.audience import band_label, index_ci, merge_groups, wilson
 
 BANDS = ["<13", "13-24", "25-44", "45-64", "65+"]
 LA = ZoneInfo("America/Los_Angeles")

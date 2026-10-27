@@ -12,7 +12,7 @@ class Homography:
 
     Calibration quality is the classic *silent* failure of CCTV analytics: a bad homography
     still produces plausible-looking heatmaps. We therefore expose the reprojection error and
-    ship ``glance calibrate`` to overlay the zones on a real frame for a human to eyeball.
+    ship ``storelens calibrate`` to overlay the zones on a real frame for a human to eyeball.
     """
 
     def __init__(self, pixel_pts, floor_pts):

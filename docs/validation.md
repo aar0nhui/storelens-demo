@@ -3,16 +3,16 @@
 The simulator shows the logic works. It does not show the detector is accurate on a real store. These two commands are
 what to run on the customer's footage before any number is shown to them.
 
-## `glance fieldcheck`
+## `storelens fieldcheck`
 
 Compares the pipeline with a person's hand tallies of the same footage and prints error figures with 95% intervals.
 
 ```bash
-glance fieldcheck --init labels/                 # blank CSV templates + fieldcheck.yaml (never overwrites existing files)
+storelens fieldcheck --init labels/                 # blank CSV templates + fieldcheck.yaml (never overwrites existing files)
 # 1. Edit the gates in labels/fieldcheck.yaml and COMMIT the file before looking at any result.
-# 2. Process the footage:  glance run ... (one run per clip or camera)
+# 2. Process the footage:  storelens run ... (one run per clip or camera)
 # 3. Label by hand (below), then:
-glance fieldcheck --config store.yaml --db store.db --spec labels/fieldcheck.yaml --json fieldcheck.json
+storelens fieldcheck --config store.yaml --db store.db --spec labels/fieldcheck.yaml --json fieldcheck.json
 ```
 
 `--gates-sha <digest>` refuses to run if the gates differ from the digest you recorded earlier, so thresholds cannot be
@@ -43,15 +43,15 @@ How many people to label (Wilson 95% interval at a true recall of 95%): 100 peop
 `scripts/make_fieldcheck_example.py` writes a worked example from the simulator with an imperfect simulated annotator.
 It shows the harness running end to end; the numbers it prints say nothing about real accuracy.
 
-## `glance audit`
+## `storelens audit`
 
 Asks: can anything we store be used to remember or single out a person?
 
 ```bash
-glance audit --config store.yaml --db store.db [--dir data/] [--json audit.json]
-glance audit ... --coarsen-days 14 [--as-of 2026-11-30]      # what-if: merge audience rows older than 14 days into days
-glance audit ... --coarsen-days 14 --apply                   # really do it, then VACUUM (irreversible)
-glance audit ... --gt clip_gt.json.gz --run 1                # simulator only: attack against the true attributes
+storelens audit --config store.yaml --db store.db [--dir data/] [--json audit.json]
+storelens audit ... --coarsen-days 14 [--as-of 2026-11-30]      # what-if: merge audience rows older than 14 days into days
+storelens audit ... --coarsen-days 14 --apply                   # really do it, then VACUUM (irreversible)
+storelens audit ... --gt clip_gt.json.gz --run 1                # simulator only: attack against the true attributes
 ```
 
 * **schema**: only the documented tables and columns, no BLOBs, nothing named like an embedding, face, image or

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from glance.config import PrivacyConfig
-from glance.privacy import Anonymizer, PreviewWriter, obscure, privacy_regions
+from storelens.config import PrivacyConfig
+from storelens.privacy import Anonymizer, PreviewWriter, obscure, privacy_regions
 
 
 def test_visit_keys_are_stable_within_a_process_and_not_reproducible_across():
@@ -56,7 +56,7 @@ def test_blur_none_yields_no_regions_and_preview_refuses(tmp_path):
 
 
 def test_database_schema_has_no_place_for_trajectories_or_images(tmp_path):
-    from glance.store import EventStore
+    from storelens.store import EventStore
     st = EventStore(tmp_path / "x.db")
     cols = {r[1] for t in ("runs", "visits", "zone_visits", "entries", "heat")
             for r in st.query(f"PRAGMA table_info({t})")}
@@ -67,7 +67,7 @@ def test_database_schema_has_no_place_for_trajectories_or_images(tmp_path):
 
 
 def test_audience_table_is_aggregate_only_and_visit_tables_hold_no_demographics(tmp_path):
-    from glance.store import EventStore
+    from storelens.store import EventStore
     st = EventStore(tmp_path / "x.db")
     cols = lambda t: [r[1] for r in st.query(f"PRAGMA table_info({t})")]  # noqa: E731
     assert cols("audience") == ["run_id", "bucket_ts", "zone_id", "metric", "age_band", "gender", "n"]
@@ -78,6 +78,6 @@ def test_audience_table_is_aggregate_only_and_visit_tables_hold_no_demographics(
 
 
 def test_no_face_or_image_artifacts_in_the_schema_scan(tmp_path):
-    from glance.audit import schema_scan
-    from glance.store import EventStore
+    from storelens.audit import schema_scan
+    from storelens.store import EventStore
     assert schema_scan(EventStore(tmp_path / "x.db"))["status"] == "PASS"

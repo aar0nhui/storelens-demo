@@ -349,7 +349,7 @@ def run_audit(cfg: StoreConfig, db_path: str | Path, data_dir: str | Path | None
             result["attack"] = attack_with_truth(cfg, store, run_id, gt)
             checks.append(result["attack"])
         if coarsen_days is not None:
-            tmp = Path(tempfile.mkdtemp(prefix="glance-audit-"))
+            tmp = Path(tempfile.mkdtemp(prefix="storelens-audit-"))
             try:
                 store.conn.commit()
                 shutil.copy(str(db_path), tmp / "copy.db")

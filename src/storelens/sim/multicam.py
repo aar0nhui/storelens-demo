@@ -68,7 +68,7 @@ def build_multicam_config(layout: Layout, specs: list[CamSpec] | None = None, ca
     cfg = StoreConfig(name=name, floor=FloorPlan(width_m=layout.width, height_m=layout.height), cameras=cams,
                       zones=zones, entrance=ent, staff=staff, output=OutputConfig(bucket_minutes=5),
                       demographics=DemographicsConfig(enabled=False))
-    for cam in cfg.cameras:  # what an installer does after running `glance cameras`: apply the suggestion
+    for cam in cfg.cameras:  # what an installer does after running `storelens cameras`: apply the suggestion
         cam.detector_params = suggest_detector_params(cfg, cam)
     return cfg
 

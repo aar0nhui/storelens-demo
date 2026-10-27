@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Write an example set of hand-label files for ``glance fieldcheck`` from the simulator's ground truth.
+"""Write an example set of hand-label files for ``storelens fieldcheck`` from the simulator's ground truth.
 
 On a real deployment a person produces these files by watching the footage. Here an imperfect "annotator" is
 simulated from the truth (a few miscounted people, missed stops, apparent-age errors) so the harness can be shown end to
@@ -7,7 +7,7 @@ end. The numbers it then prints are about the HARNESS working, not about how acc
 
     python scripts/make_fieldcheck_example.py --demo demo_out --out examples/fieldcheck
 
-``--demo`` is a folder produced by ``glance demo`` (store.yaml, demo.db, <label>_gt.json.gz).
+``--demo`` is a folder produced by ``storelens demo`` (store.yaml, demo.db, <label>_gt.json.gz).
 """
 from __future__ import annotations
 
@@ -20,9 +20,9 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 
-from glance.config import load_config
-from glance.store import EventStore
-from glance.validate import gt_events, load_gt
+from storelens.config import load_config
+from storelens.store import EventStore
+from storelens.validate import gt_events, load_gt
 
 
 def main() -> int:
@@ -110,7 +110,7 @@ def main() -> int:
           "simulated annotator: apparent age band and perceived gender of everyone who came in")
     (out / "fieldcheck.yaml").write_text(
         "# Example spec. On a real store: commit the gates BEFORE looking at results, then run\n"
-        "#   glance fieldcheck --config store.yaml --db glance.db --spec fieldcheck.yaml\n"
+        "#   storelens fieldcheck --config store.yaml --db storelens.db --spec fieldcheck.yaml\n"
         f"runs: {run_ids}\n"
         "empty_runs: [EMPTY_RUN_ID]   # replaced by scripts/run_fieldcheck_example.sh after processing the empty-store clip\n"
         "door_tally: door_tally.csv\ncrowd: crowd.csv\nstops: stops.csv\nstops_exhaustive: true\ndemo_labels: demo_labels.csv\n"
