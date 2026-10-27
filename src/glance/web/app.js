@@ -260,6 +260,9 @@
     const onSize = (w) => { if (Math.abs(w - lastW) < 1) return; lastW = w; clearTimeout(rt); rt = setTimeout(redraw, 100); };
     if ('ResizeObserver' in window) new ResizeObserver((es) => onSize(es[0].contentRect.width)).observe($('#panes'));
     else window.addEventListener('resize', () => onSize(window.innerWidth));
+    // Canvas labels are pixels, not text, so they do not reflow when a font arrives: with font-display: swap the
+    // floor plan would stay lettered in the fallback stack until something else redrew it.
+    if (document.fonts) document.fonts.ready.then(() => { markDirty(); paint(state.tab); });
 
     await load();
     initLive();
@@ -509,12 +512,12 @@
       else if (z.id === state.zone || z.id === v.hover) { ctx.globalAlpha = 0.14; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1; }
       ctx.lineWidth = z.id === state.zone ? 2.5 : 1.25; ctx.strokeStyle = col; ctx.setLineDash(z.kind === 'staff' ? [4, 3] : []); ctx.stroke(); ctx.setLineDash([]);
       const cx = z.polygon.reduce((a, p) => a + p[0], 0) / z.polygon.length * sx, cy = z.polygon.reduce((a, p) => a + p[1], 0) / z.polygon.length * sy;
-      ctx.font = '600 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
+      ctx.font = '600 11px ' + css('--font'); ctx.textAlign = 'center'; ctx.lineJoin = 'round';
       const label = z.name + (state.mode === 'engaged' && zm && zm.engaged_per_100 !== null ? ' · ' + num(zm.engaged_per_100, 1) : '');
       ctx.strokeStyle = css('--card'); ctx.lineWidth = 3.5; ctx.strokeText(label, cx, cy); ctx.fillStyle = css('--ink'); ctx.fillText(label, cx, cy);
     }
     const e = cfg.entrance; ctx.strokeStyle = css('--bad'); ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(e.p1[0] * sx, e.p1[1] * sy); ctx.lineTo(e.p2[0] * sx, e.p2[1] * sy); ctx.stroke();
-    ctx.fillStyle = css('--muted'); ctx.font = '11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Entrance', (e.p1[0] + e.p2[0]) / 2 * sx, e.p1[1] * sy - 7);
+    ctx.fillStyle = css('--muted'); ctx.font = '11px ' + css('--font'); ctx.textAlign = 'center'; ctx.fillText('Entrance', (e.p1[0] + e.p2[0]) / 2 * sx, e.p1[1] * sy - 7);
 
     const lg = v.legend; lg.replaceChildren();
     if (state.mode === 'traffic') lg.append(h('span', {}, 'Less'), h('span', { class: 'ramp' }), h('span', {}, 'More time spent'),

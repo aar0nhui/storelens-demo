@@ -132,6 +132,9 @@ def test_dark_mode_toggle(client, chromium, tmp_path):  # noqa: F811
     try:
         page.goto(base + "/#/floor")
         page.wait_for_selector("#zoneTable tr.zrow")
+        # the canvas is redrawn when the bundled font lands, so take the baseline after that or it races the swap
+        page.wait_for_function("document.fonts.ready.then(() => true)")
+        page.wait_for_timeout(250)
         # nothing stored yet: no override, so the stylesheet follows the operating system (headless chromium = light)
         assert theme() is None
         light_bg, light_floor = bg(), page.evaluate("document.querySelector('canvas.floor').toDataURL()")
@@ -153,4 +156,40 @@ def test_dark_mode_toggle(client, chromium, tmp_path):  # noqa: F811
     finally:
         page.close()
         srv.shutdown()
+    assert not problems, problems
+
+
+def test_bundled_font_loads_under_the_csp(client, chromium, tmp_path):  # noqa: F811
+    """Geist ships with the site instead of being fetched. The CSP is `default-src 'none'`, so a missing font-src
+    would silently block the file and leave the dashboard on the fallback stack: check the face actually loaded and
+    that nothing was requested off-origin to get it."""
+    root = tmp_path / "www"
+    build_site(client.db_path, client.cfg_path, str(root))
+    assert (root / "static" / "Geist-Variable.woff2").is_file()
+    assert (root / "static" / "Geist-LICENSE.txt").is_file(), "the OFL has to travel with the font"
+    css = (root / "static" / "style.css").read_text(encoding="utf-8")
+    assert 'url("Geist-Variable.woff2")' in css  # relative, so it also resolves under /some/sub/path/
+    assert "font-src 'self'" in (root / "index.html").read_text(encoding="utf-8")
+
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(root))
+    handler.log_message = lambda *a, **k: None
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    page = chromium.new_page(viewport={"width": 1280, "height": 860})
+    problems, requested = [], []
+    page.on("pageerror", lambda e: problems.append(str(e)))
+    page.on("console", lambda m: problems.append(m.text) if m.type == "error" else None)
+    page.on("request", lambda r: requested.append(r.url))
+    try:
+        page.goto(base + "/")
+        page.wait_for_selector("#kpis .kpi")
+        page.wait_for_function("document.fonts.ready.then(() => true)")
+        assert page.evaluate("document.fonts.check('14px Geist')"), "Geist did not load; the CSP or the path is wrong"
+        assert page.evaluate("getComputedStyle(document.body).fontFamily").startswith("Geist")
+        assert any(u.endswith("/static/Geist-Variable.woff2") for u in requested), "the face was never fetched"
+    finally:
+        page.close()
+        srv.shutdown()
+    assert all(u.startswith(base) for u in requested), [u for u in requested if not u.startswith(base)]
     assert not problems, problems

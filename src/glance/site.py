@@ -18,7 +18,7 @@ from .server import WEB_DIR, build_snapshot, find_live, live_info
 # Scripts and styles only from this origin; no fetches except to ourselves; no inline script. (Inline *style attributes*
 # are used by the charts, hence 'unsafe-inline' for styles only.) Set as a <meta> so it also holds on hosts that
 # cannot send headers (GitHub Pages).
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; "
        "media-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'")
 
 # Cloudflare Pages / Workers static assets read this file; other hosts ignore it.
@@ -32,7 +32,8 @@ HEADERS = """/*
 NOT_FOUND = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Not found · Glance</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f4f6f9;color:#141a23}
+<style>@font-face{font-family:Geist;src:url("static/Geist-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
+body{font:16px/1.5 Geist,system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f4f6f9;color:#141a23}
 a{color:#2c6bed}</style></head>
 <body><p>That page does not exist. <a href="./">Back to the Glance demo</a></p></body></html>
 """
@@ -71,7 +72,7 @@ def build_site(db_path: str | None, config_path: str | None, out_dir: str, live_
         shutil.rmtree(p) if p.is_dir() else p.unlink(missing_ok=True)
     (out / "static").mkdir()
     (out / "data").mkdir()
-    for f in ("style.css", "app.js"):
+    for f in ("style.css", "app.js", "Geist-Variable.woff2", "Geist-LICENSE.txt"):  # the OFL travels with the font
         shutil.copy2(WEB_DIR / f, out / "static" / f)
 
     if live is not None:
