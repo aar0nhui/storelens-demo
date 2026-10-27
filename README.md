@@ -195,6 +195,10 @@ collapses to an icon rail (names appear as tooltips), remembers the choice in th
 drawer behind a menu button. A **light/dark toggle** sits in the top bar: until it is used the dashboard follows the
 operating system, and a click pins light or dark for that browser.
 
+Type is **Geist** (SIL OFL 1.1; the licence ships beside it in `src/glance/web/`). It is bundled, not fetched from a
+font CDN, so the no-external-requests promise still holds: the static site serves it from its own origin and the
+standalone report embeds it. System fonts stay behind it in the stack, for the swap and for anywhere it cannot load.
+
 * **Overview**: the four headline numbers (visitors, display impressions, visitors who engaged, median engaged time)
   and the simulated live view (store camera + live floor plan, in sync).
 * **Floor plan**: the large floor plan (traffic heat or engaged per 100 visitors), a detail panel for the selected

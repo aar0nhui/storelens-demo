@@ -10,9 +10,10 @@ ships with a strict Content-Security-Policy.
 ## 1. What gets deployed
 
 ```
-site/                      10 files, 3.1 MB (largest: media/camera.mp4, 1.8 MB)
+site/                      12 files, 2.7 MB (largest: media/camera.mp4, 1.4 MB)
   index.html               the dashboard, with a CSP <meta> tag and relative URLs (also works under /some/sub/path/)
   static/app.js, style.css the dashboard code
+  static/Geist-*           the bundled font and its OFL licence (no font is fetched from anyone else)
   data/snapshot.js         every default view as JSON, built from demo_data/
   media/*.mp4              simulated live view (store camera + live floor plan)
   _headers                 security headers (read by Cloudflare; ignored by other hosts)
