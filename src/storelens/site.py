@@ -31,11 +31,11 @@ HEADERS = """/*
 
 NOT_FOUND = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Not found · Glance</title>
+<title>Not found · StoreLens</title>
 <style>@font-face{font-family:Geist;src:url("static/Geist-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
 body{font:16px/1.5 Geist,system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f4f6f9;color:#141a23}
 a{color:#2c6bed}</style></head>
-<body><p>That page does not exist. <a href="./">Back to the Glance demo</a></p></body></html>
+<body><p>That page does not exist. <a href="./">Back to the StoreLens demo</a></p></body></html>
 """
 
 # files and folders this command owns inside --out; anything else in there is left alone
@@ -84,9 +84,9 @@ def build_site(db_path: str | None, config_path: str | None, out_dir: str, live_
 
     if not private:
         demo = {k: v for k, v in {"label": demo_label, "ctaText": cta_text, "ctaUrl": cta_url}.items() if v}
-        js = "window.__GLANCE_SNAPSHOT__ = " + json.dumps(snap, default=float, separators=(",", ":")) + ";\n"
+        js = "window.__STORELENS_SNAPSHOT__ = " + json.dumps(snap, default=float, separators=(",", ":")) + ";\n"
         if demo:
-            js += "window.__GLANCE_DEMO__ = " + json.dumps(demo) + ";\n"
+            js += "window.__STORELENS_DEMO__ = " + json.dumps(demo) + ";\n"
         (out / "data" / "snapshot.js").write_text(js, encoding="utf-8")
     else:
         (out / "data").rmdir()

@@ -1,4 +1,4 @@
-/* Glance dashboard. Colours are tokens: chart series, status and surfaces each have their own role, and dark mode is
+/* StoreLens dashboard. Colours are tokens: chart series, status and surfaces each have their own role, and dark mode is
    its own set of steps (not an automatic flip). */
 /* Geist is bundled, never fetched: the dashboard makes no external requests, and the static site's CSP allows fonts
    from this origin only. One variable file covers every weight the UI asks for (540-700). SIL OFL 1.1, see

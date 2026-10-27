@@ -5,10 +5,10 @@ What this is, and is not
 Every recommendation is a *scenario*: "if display X reached as many visitors as the typical display, you would get about
 N more engaged shoppers a day". The measured part is the current reach / engagement rate per display (with sample
 sizes). The target is a stated benchmark (the store's own median display), not a forecast of what a change will do. The
-money part multiplies extra engaged shoppers by TWO ASSUMPTIONS that Glance does not measure: the share of engaged
+money part multiplies extra engaged shoppers by TWO ASSUMPTIONS that StoreLens does not measure: the share of engaged
 shoppers who buy (a low-high range) and what they spend. Those come from ``business:`` in the config and are shown, and
 editable, next to every number. Footfall effects of marketing are sensitivity tables ("+10% visitors from this group"),
-never predictions: Glance has no data on how many people an advertisement brings through the door.
+never predictions: StoreLens has no data on how many people an advertisement brings through the door.
 
 Test any recommendation you act on with Compare (before/after, with intervals).
 """
@@ -314,7 +314,7 @@ def _segment_recs(an: Analytics, w: Window, audience: dict | None, V: float, pr,
                         f"Aim promotions for {zr['name']} at {label} (their channels, their wording).",
                         "Re-measure the audience mix after the campaign."],
             "scenarios": scenarios, "confidence": zr["confidence"],
-            "note": "Sensitivity table, not a forecast: Glance does not measure how many extra people a campaign "
+            "note": "Sensitivity table, not a forecast: StoreLens does not measure how many extra people a campaign "
                     "brings in. It shows what extra visitors from this group would be worth at today's behaviour.",
         })
     # an under-served group: engages with the displays clearly less than the store average

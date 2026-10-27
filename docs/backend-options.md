@@ -37,7 +37,7 @@ month (billed annually). Use this for investor/partner demos and early pilot own
 
 ```
 store (laptop / mini PC)                        Cloudflare (free tier)
-  CCTV -> glance run -> local SQLite           Worker  POST /ingest   (per-store API key, hashed)
+  CCTV -> storelens run -> local SQLite           Worker  POST /ingest   (per-store API key, hashed)
   nightly: build snapshot JSON, aggregate heat -> R2     stores snapshot per store and period
                                                   Worker  GET /data/<store>.js  (checks Access identity -> store)
   video never leaves the store                    static dashboard (same site/ folder) behind Cloudflare Access
@@ -45,9 +45,9 @@ store (laptop / mini PC)                        Cloudflare (free tier)
 
 Why this fits what we built: the dashboard already reads a precomputed snapshot (`build_snapshot`), the statistics
 (bootstrap lift) stay in Python on the store's box, and the cloud only stores and serves JSON. No database, no
-always-on server. A tiny table (email to store id) lives in D1 or KV. What to add to the repo: a `glance snapshot`
+always-on server. A tiny table (email to store id) lives in D1 or KV. What to add to the repo: a `storelens snapshot`
 command that writes one store's snapshot JSON, an `/ingest` Worker, a `/data` Worker, and a loader in `app.js` that
-fetches the snapshot instead of reading `window.__GLANCE_SNAPSHOT__`.
+fetches the snapshot instead of reading `window.__STORELENS_SNAPSHOT__`.
 
 Limits you give up: the dashboard shows the periods you precomputed (for example the last 7 and 28 days), not arbitrary
 date ranges. That is fine for pilots and is the trigger for stage 3.

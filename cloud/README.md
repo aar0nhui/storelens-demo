@@ -1,4 +1,4 @@
-# Glance private app (Cloudflare Worker)
+# StoreLens private app (Cloudflare Worker)
 
 The dashboard for ONE customer: static files plus `/ingest` and `/data`, all behind Cloudflare Access, with data kept in
 an R2 bucket. Setup steps, the two Access applications, the variables in `wrangler.jsonc` and the tests are in

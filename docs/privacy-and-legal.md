@@ -21,27 +21,27 @@ never stored".
 
 | claim | where |
 |---|---|
-| No face images, crops, embeddings or appearance features are written anywhere | schema scan and file scan: `tests/test_privacy.py`, `tests/test_audit.py`; `glance audit` repeats both on a real database and folder |
+| No face images, crops, embeddings or appearance features are written anywhere | schema scan and file scan: `tests/test_privacy.py`, `tests/test_audit.py`; `storelens audit` repeats both on a real database and folder |
 | No per-person trajectory is persisted | DB has no coordinate columns; `tests/test_pipeline_sim.py` |
 | Visit keys cannot be linked across days | salt in memory only, rotated every 24 h of data time (`test_keys_rotate_with_the_salt_epoch`) |
 | Previews never show unblurred people | mosaic before draw/encode; `blur: none` refused without `--allow-raw-preview` |
 | Age band and gender are never attached to a visit | the `audience` table has no visit key and no per-person column (`test_audience_table_is_aggregate_only_and_visit_tables_hold_no_demographics`) |
 | An estimator forgets a person when their track ends | `test_estimator_forgets_a_person_after_finalize_and_discard` |
-| Time buckets are coarse | 6 hours by default, aligned to local midnight; `glance audit` checks every stored timestamp sits on a boundary |
+| Time buckets are coarse | 6 hours by default, aligned to local midnight; `storelens audit` checks every stored timestamp sits on a boundary |
 | Small groups are not shown | groups under `min_cell` (default 10) are merged into neighbouring age bands or hidden; gender is shown only when both sides reach the minimum (`test_the_dashboard_view_never_shows_a_group_below_k`) |
 | "Unknown" is a real answer | low-confidence estimates are never forced into a guess; the dashboard shows what share of visitors got an estimate |
 | The cloud copy holds only what the dashboard shows | the store computer and the Worker both refuse per-person keys, images and embedded media (`tests/test_cloud_e2e.py`, `cloud/test/worker.test.js`) |
-| The simulated live view does not persist trajectories | per-frame tracks live in memory while the clip renders; only the two videos are written (`src/glance/live.py`) |
+| The simulated live view does not persist trajectories | per-frame tracks live in memory while the clip renders; only the two videos are written (`src/storelens/live.py`) |
 
 ## What it does not guarantee
 
-* The **raw video** still exists wherever the store's CCTV system keeps it. Glance reads it; it does not control retention.
+* The **raw video** still exists wherever the store's CCTV system keeps it. StoreLens reads it; it does not control retention.
 * Zone dwell per anonymous visit and the heat map are still data *derived from people's behaviour*. Whether that is
   "personal data" depends on the jurisdiction and on whether the operator could single someone out.
 * **Which display someone visited tells you something about them.** That is inherent to the product (it is what the
   audience insight is) and is not a leak. What the audit can reduce is how much the *time bucket* adds on top. A tiny
   cell at rest ("65+ female, display 3, Tuesday 10:00-16:00") describes one person, which is why cells under `min_cell`
-  are suppressed in the dashboard and why `glance audit --coarsen-days N --apply` can merge old buckets into days and
+  are suppressed in the dashboard and why `storelens audit --coarsen-days N --apply` can merge old buckets into days and
   fold the remaining small cells into "unknown".
 * Cross-day linkage is structurally impossible in the code (the salt rotates and no appearance feature is kept). The
   proof is still a staged test with consenting volunteers on two days, not the code review alone.
@@ -49,7 +49,7 @@ never stored".
   have found larger errors for darker-skinned women. "Perceived gender" is not a fact about anyone, and it misclassifies
   trans and non-binary people. Use it only for aggregate marketing context.
 * Overhead ceiling cameras usually cannot see faces. Audience mode needs an eye-level or entrance camera, and accuracy
-  must be measured on the store's own footage (`glance fieldcheck`, see [validation.md](validation.md)).
+  must be measured on the store's own footage (`storelens fieldcheck`, see [validation.md](validation.md)).
 * Hosting on a server means footage leaves the store. Keep video on the store computer; only the dashboard's aggregate
   snapshot is sent to the cloud app ([cloud.md](cloud.md)).
 

@@ -1,4 +1,4 @@
-# Glance
+# StoreLens
 
 Privacy-first marketing analytics that runs on a store's **existing CCTV**. It counts anonymous people over time,
 shows which displays they come near and stop at, for how long, tells the owner which layout changes worked, and suggests
@@ -22,7 +22,7 @@ video ─▶ person detector ─▶ ByteTrack ─▶ floor-plan homography ─�
 
 ```bash
 pip install -e ".[dev]"          # Python >= 3.10
-glance demo --out demo --minutes 20 --preview
+storelens demo --out demo --minutes 20 --preview
 #   1. simulates two 20-minute weeks of a store ("baseline" and "after_change": new signage on Endcap B)
 #   2. runs the full pipeline on both videos
 #   3. scores it against the simulator's ground truth  -> demo/validation.json
@@ -30,7 +30,7 @@ glance demo --out demo --minutes 20 --preview
 #   5. writes a standalone dashboard                     -> demo/report.html   (open in any browser, works offline)
 #      (add --minutes 90 for a comparison with enough visitors to be conclusive; --no-live skips step 4)
 
-glance serve --config demo/store.yaml --db demo/demo.db     # live dashboard at http://127.0.0.1:8000
+storelens serve --config demo/store.yaml --db demo/demo.db     # live dashboard at http://127.0.0.1:8000
 pytest                                                          # ~6 min; `pytest -m "not slow"` skips the video tests (~1 min)
 (cd cloud && npm ci && npm test)                                # private-app Worker tests (Node 20+)
 ```
@@ -39,17 +39,17 @@ Individual steps:
 
 | command | what it does |
 |---|---|
-| `glance sim --out DIR --minutes N` | render synthetic overhead CCTV video + `store.yaml` + ground truth |
-| `glance calibrate --config store.yaml --video v.mp4` | draw the zones over a real frame to eyeball the calibration before trusting any number |
-| `glance run --config store.yaml --video v.mp4 --start 2026-11-02T10:00 --db store.db --label week1 [--preview p.mp4]` | video → events (`--detector bgsub｜yolox_onnx｜rfdetr`, `--engagement-mode stop｜stop_facing`) |
-| `glance validate --config … --db … --run 1 --gt clip_gt.json.gz` | compare a run to simulator ground truth |
-| `glance cameras --config store.yaml [--png map.png]` | per-camera calibration (leave-one-out error), floor coverage, which camera owns which display |
-| `glance fieldcheck --init labels/` then `--spec labels/fieldcheck.yaml` | score the pipeline against hand tallies from the customer's own footage, with intervals and pre-registered gates |
-| `glance audit --config … --db …` | privacy audit: schema, files on disk, timestamp resolution, linkage attack on the stored counts (`--coarsen-days`) |
-| `glance snapshot` / `glance push` | write the dashboard's answers as JSON / send them to the private cloud app |
-| `glance live --out live --seconds 60` | simulate the live view: a store-camera feed and a live floor plan, in sync |
-| `glance serve` / `glance report` | live dashboard / single-file HTML report (both pick up `live/` next to the database) |
-| `glance site --out site` | static website folder for Cloudflare / GitHub Pages / any CDN (`--demo-label`, `--cta-url`, `--noindex`) |
+| `storelens sim --out DIR --minutes N` | render synthetic overhead CCTV video + `store.yaml` + ground truth |
+| `storelens calibrate --config store.yaml --video v.mp4` | draw the zones over a real frame to eyeball the calibration before trusting any number |
+| `storelens run --config store.yaml --video v.mp4 --start 2026-11-02T10:00 --db store.db --label week1 [--preview p.mp4]` | video → events (`--detector bgsub｜yolox_onnx｜rfdetr`, `--engagement-mode stop｜stop_facing`) |
+| `storelens validate --config … --db … --run 1 --gt clip_gt.json.gz` | compare a run to simulator ground truth |
+| `storelens cameras --config store.yaml [--png map.png]` | per-camera calibration (leave-one-out error), floor coverage, which camera owns which display |
+| `storelens fieldcheck --init labels/` then `--spec labels/fieldcheck.yaml` | score the pipeline against hand tallies from the customer's own footage, with intervals and pre-registered gates |
+| `storelens audit --config … --db …` | privacy audit: schema, files on disk, timestamp resolution, linkage attack on the stored counts (`--coarsen-days`) |
+| `storelens snapshot` / `storelens push` | write the dashboard's answers as JSON / send them to the private cloud app |
+| `storelens live --out live --seconds 60` | simulate the live view: a store-camera feed and a live floor plan, in sync |
+| `storelens serve` / `storelens report` | live dashboard / single-file HTML report (both pick up `live/` next to the database) |
+| `storelens site --out site` | static website folder for Cloudflare / GitHub Pages / any CDN (`--demo-label`, `--cta-url`, `--noindex`) |
 
 ## What it measures
 
@@ -88,7 +88,7 @@ Insight cards are plain rules, each naming the numbers behind it and a confidenc
 * **Staff are excluded** by uniform colour and by time spent in the back-of-house zone, and kept out of every metric.
 
 See [`docs/privacy-and-legal.md`](docs/privacy-and-legal.md) for the consent and legal checklist (not legal advice) and
-[`docs/validation.md`](docs/validation.md) for `glance audit`, which tests these claims on a real database.
+[`docs/validation.md`](docs/validation.md) for `storelens audit`, which tests these claims on a real database.
 
 ## Audience and recommendations
 
@@ -105,7 +105,7 @@ These are scenarios against the store's own median display, not forecasts. Detai
 ## More than one camera
 
 Every floor spot and every display has exactly one owning camera, so overlapping cameras never double count, and nothing
-links a person across cameras. `glance cameras` reports calibration quality and coverage; see
+links a person across cameras. `storelens cameras` reports calibration quality and coverage; see
 [`docs/cameras.md`](docs/cameras.md).
 
 ## Private cloud app (one customer)
@@ -132,13 +132,13 @@ store's own cameras before trusting them there.
 1. Copy `demo/store.yaml`. Set `floor` (metres), the `zones` (polygons in floor metres), and the `entrance` segment.
 2. Click ≥ 4 matching points on a camera frame and on the floor plan (`pixel_points` ↔ `floor_points`); more is better.
    The run's `calibration_rmse_cm` is shown on the dashboard's Quality card and warns above 10 cm.
-3. `glance calibrate --config store.yaml --video clip.mp4` and *look* at the overlay. A silent calibration error
+3. `storelens calibrate --config store.yaml --video clip.mp4` and *look* at the overlay. A silent calibration error
    corrupts every zone number without any visible failure, so this is the step not to skip.
 4. Put the staff uniform colour in `staff.hsv_ranges`; add `mask_polygons` for windows, mirrors and screens.
 
 ## Validation harness
 
-`glance validate` replays the same analytics on the simulator's ground-truth positions and scores the pipeline:
+`storelens validate` replays the same analytics on the simulator's ground-truth positions and scores the pipeline:
 footfall precision/recall, impression and engaged-visitor error per fixture, heat-map correlation, staff leakage, and
 ghost tracks. It scores four engagement variants against the shoppers' scripted browse intent: stop-only,
 stop + motion-facing, the pipeline as run, and a perfect-perception ceiling (what a flawless detector with this
@@ -146,7 +146,7 @@ stop + motion-facing, the pipeline as run, and a perfect-perception ceiling (wha
 
 ### Results on the bundled simulator
 
-Two runs of `glance demo --seed 18`: 20 minutes per week (about 100-120 visitors) and `--minutes 90` (about 500-580
+Two runs of `storelens demo --seed 18`: 20 minutes per week (about 100-120 visitors) and `--minutes 90` (about 500-580
 visitors). Each cell is week 1 / week 2 (baseline / after the Endcap B change).
 
 | | 20 min per week | 90 min per week |
@@ -189,13 +189,13 @@ run above shows what the same system says when the draw is small.
 
 ## Dashboard layout
 
-`glance serve`, the standalone `report.html` and the static site all show the same dashboard (offline, no external
-requests). A **collapsible sidebar** jumps between sections; clicking the Glance logo or name returns to Overview. It
+`storelens serve`, the standalone `report.html` and the static site all show the same dashboard (offline, no external
+requests). A **collapsible sidebar** jumps between sections; clicking the StoreLens logo or name returns to Overview. It
 collapses to an icon rail (names appear as tooltips), remembers the choice in the browser, and on a phone becomes a
 drawer behind a menu button. A **light/dark toggle** sits in the top bar: until it is used the dashboard follows the
 operating system, and a click pins light or dark for that browser.
 
-Type is **Geist** (SIL OFL 1.1; the licence ships beside it in `src/glance/web/`). It is bundled, not fetched from a
+Type is **Geist** (SIL OFL 1.1; the licence ships beside it in `src/storelens/web/`). It is bundled, not fetched from a
 font CDN, so the no-external-requests promise still holds: the static site serves it from its own origin and the
 standalone report embeds it. System fonts stay behind it in the stack, for the swap and for anywhere it cannot load.
 
@@ -218,7 +218,7 @@ or Chromium is not installed).
 
 ## Static demo (free hosting)
 
-`make site` (= `glance site --config demo_data/store.yaml --db demo_data/demo.db --out site`) writes the dashboard as a
+`make site` (= `storelens site --config demo_data/store.yaml --db demo_data/demo.db --out site`) writes the dashboard as a
 plain folder: 10 files, 3 MB, relative URLs, a strict Content-Security-Policy, no server and no third-party requests.
 Commit `site/` and let Cloudflare (Workers static assets or Pages) or any static host publish it on every push.
 Step-by-step, limits and costs: [`docs/deploy-static-demo.md`](docs/deploy-static-demo.md). What to add once real stores
@@ -226,7 +226,7 @@ and users arrive (auth, storage, ingest) and what it costs: [`docs/backend-optio
 
 ## Live view (simulated)
 
-`glance live` (also part of `glance demo`) renders a one-minute **simulated live feed** for the dashboard: a
+`storelens live` (also part of `storelens demo`) renders a one-minute **simulated live feed** for the dashboard: a
 general store-camera view next to a live floor plan, playing in sync, with the same anonymous track ids on both.
 
 * **Store camera**: a perspective view from a high front corner of the same simulated store (shelves, shoppers, red-vest
@@ -247,13 +247,13 @@ stand still; the batch metrics already exclude staff.
 ## Known limitations
 
 * **Synthetic only.** Real-world detector accuracy, lighting, occlusion, and camera angles are untested. The first
-  real-footage run is the most important next step. `glance fieldcheck` is the tool for it, but it has only been run
+  real-footage run is the most important next step. `storelens fieldcheck` is the tool for it, but it has only been run
   against the simulator.
 * **Audience numbers in the demo are simulated** (a noisy copy of the simulator's truth). Overhead ceiling cameras
   usually cannot see faces; real audience mode needs an eye-level or entrance camera and a measured model.
 * **Revenue and traffic estimates rest on assumptions** (purchase rate, basket size, visitors per day) and on the store's
   own median as the target. They are scenarios to test with Compare, not forecasts.
-* **No on-site setup wizard yet.** Cameras are configured in `store.yaml` and checked with `glance cameras`.
+* **No on-site setup wizard yet.** Cameras are configured in `store.yaml` and checked with `storelens cameras`.
 * **"Facing" is not measured.** Without a head/pose model, orientation can only come from walking direction. In the
   simulator that **lowered** recall (people standing still after a walk lose a reliable heading), so the default is
   `engagement_mode: stop`. Remaining stop-only error is definitional: people who stop but look elsewhere. The
@@ -279,7 +279,7 @@ stand still; the batch metrics already exclude staff.
 ## Repository layout
 
 ```
-src/glance/
+src/storelens/
   config.py geometry.py        store.yaml models, homography + calibration QA
   detect/                      bgsub, yolox_onnx, rfdetr (experimental), Detector interface
   track.py                     ByteTrack wrapper + motion-only stitching with floor-edge guard

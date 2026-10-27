@@ -1,5 +1,5 @@
 // Payload guard: the cloud only ever stores aggregates. A snapshot that carries per-person or image data is rejected,
-// even though the store's computer already checked (src/glance/cloudsync.py: keep the two lists in sync).
+// even though the store's computer already checked (src/storelens/cloudsync.py: keep the two lists in sync).
 
 export const FORBIDDEN_KEYS = new Set([
   "embedding", "embeddings", "face", "faces", "face_crop", "crop", "crops", "thumbnail", "thumbnails", "landmark",

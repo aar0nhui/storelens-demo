@@ -1,4 +1,4 @@
-/* Glance dashboard: dependency-free. Works against the live API or an embedded snapshot (static report / site).
+/* StoreLens dashboard: dependency-free. Works against the live API or an embedded snapshot (static report / site).
  *
  * Layout: a collapsible sidebar that jumps between sections, and one section at a time in the main column:
  *   Overview · A/B test · Floor plan · Traffic · Audience · Recommendations · Data & privacy.
@@ -7,7 +7,7 @@
  * (the ⓘ marks) and in the definitions on Data & privacy. */
 (function () {
   'use strict';
-  const SNAP = window.__GLANCE_SNAPSHOT__ || null;
+  const SNAP = window.__STORELENS_SNAPSHOT__ || null;
   const $ = (s, r = document) => r.querySelector(s);
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -51,7 +51,7 @@
   // time rather than from init(), so the page is never painted in the wrong theme first.
   const mqDark = window.matchMedia('(prefers-color-scheme: dark)');
   const theme = {
-    stored: () => { const v = prefs.get('glance.theme'); return v === 'light' || v === 'dark' ? v : null; },
+    stored: () => { const v = prefs.get('storelens.theme'); return v === 'light' || v === 'dark' ? v : null; },
     now: () => theme.stored() || (mqDark.matches ? 'dark' : 'light'),
     apply() {
       const v = theme.stored();
@@ -101,7 +101,7 @@
   const mqMobile = window.matchMedia('(max-width: 860px)');
   function setupSidebar() {
     const app = $('#app'), side = $('#side'), tog = $('#sideToggle'), menu = $('#menuBtn'), scrim = $('#scrim');
-    const saved = prefs.get('glance.sidebar');
+    const saved = prefs.get('storelens.sidebar');
     app.classList.toggle('collapsed', saved ? saved === 'collapsed' : window.innerWidth < 1100);
     requestAnimationFrame(() => requestAnimationFrame(() => app.classList.remove('boot')));  // no slide-in animation on load
     const sync = () => {
@@ -119,7 +119,7 @@
     tog.addEventListener('click', () => {
       if (mqMobile.matches) { closeDrawer(); menu.focus(); return; }
       const collapsed = app.classList.toggle('collapsed');
-      prefs.set('glance.sidebar', collapsed ? 'collapsed' : 'open');
+      prefs.set('storelens.sidebar', collapsed ? 'collapsed' : 'open');
       sync();
     });
     menu.addEventListener('click', () => { app.classList.add('drawer-open'); sync(); tog.focus(); });
@@ -140,7 +140,7 @@
     };
     // charts and the floor-plan canvas read the colour tokens when they draw, so a switch means redrawing them
     const restyle = () => { sync(); markDirty(); paint(state.tab); };
-    btn.addEventListener('click', () => { prefs.set('glance.theme', theme.now() === 'dark' ? 'light' : 'dark'); theme.apply(); restyle(); });
+    btn.addEventListener('click', () => { prefs.set('storelens.theme', theme.now() === 'dark' ? 'light' : 'dark'); theme.apply(); restyle(); });
     mqDark.addEventListener('change', () => { theme.apply(); restyle(); });  // only visible while nothing is stored
     sync();
   }
@@ -162,7 +162,7 @@
     });
     TABS.forEach((x) => { $('#pane-' + x).hidden = x !== t; });
     $('#pageTitle').textContent = TITLES[t];
-    document.title = TITLES[t] + ' · ' + (state.cfg ? state.cfg.name + ' · ' : '') + 'Glance';
+    document.title = TITLES[t] + ' · ' + (state.cfg ? state.cfg.name + ' · ' : '') + 'StoreLens';
     ui.closeDrawer();
     if (changed) window.scrollTo(0, 0);
     paint(t);
@@ -224,7 +224,7 @@
       [state.cfg, state.runs, state.cams] = await Promise.all([api('/api/config'), api('/api/runs'), api('/api/cameras').catch(() => null)]);
     } catch (e) { $('#panes').prepend(h('div', { class: 'empty' }, 'Could not load data: ' + e.message)); return; }
     $('#storeName').textContent = state.cfg.name;
-    const demo = window.__GLANCE_DEMO__;  // set by `glance site`: "simulated data" label + optional call-to-action link
+    const demo = window.__STORELENS_DEMO__;  // set by `storelens site`: "simulated data" label + optional call-to-action link
     if (demo && demo.label) { const chip = $('#demoChip'); chip.textContent = demo.label; chip.hidden = false; }
     if (demo && /^(https?:|mailto:)/i.test(demo.ctaUrl || '')) { const a = $('#ctaLink'); a.href = demo.ctaUrl; a.textContent = demo.ctaText || 'Request a pilot'; a.hidden = false; }
     // One entry per recording session: with several cameras a session is several runs (one per camera) analysed together.
@@ -786,7 +786,7 @@
   function renderAudience() {
     const a = state.d.audience, off = $('#audOff'), body = $('#audBody');
     const say = (msg) => { off.hidden = false; body.hidden = true; off.replaceChildren(empty(msg)); };
-    if (!a) return say('This view is not in the data file. Rebuild the site with a current version of Glance.');
+    if (!a) return say('This view is not in the data file. Rebuild the site with a current version of StoreLens.');
     if (!a.enabled) return say('Audience estimates are switched off for this store. They are opt-in and need a legal review first (see Data & privacy).');
     if (!a.has_data) return say('No audience counts in this period yet.');
     off.hidden = true; body.hidden = false;
@@ -921,7 +921,7 @@
   }
   function renderRecommend() {
     const r = state.d.recs;
-    if (!r) { $('#recList').replaceChildren(empty('This view is not in the data file. Rebuild the site with a current version of Glance.')); return; }
+    if (!r) { $('#recList').replaceChildren(empty('This view is not in the data file. Rebuild the site with a current version of StoreLens.')); return; }
     ensureAssume();
     $('#recAssume').hidden = !state.assume;
     if (!state.assume) { $('#recMapWrap').hidden = true; $('#recList').replaceChildren(empty(r.warnings[0] || 'Not enough data.')); $('#recMkt').replaceChildren(); return; }

@@ -22,11 +22,11 @@ from pathlib import Path
 
 import numpy as np
 
-from glance.analysis import ZoneVisit
-from glance.queries import Analytics, Window
-from glance.recommend import recommend
-from glance.sim.layout import build_store_config, default_layout
-from glance.store import EventStore
+from storelens.analysis import ZoneVisit
+from storelens.queries import Analytics, Window
+from storelens.recommend import recommend
+from storelens.sim.layout import build_store_config, default_layout
+from storelens.store import EventStore
 
 T0 = 1_800_000_000.0
 FIX = ["front_table", "wall_a", "gondola_c", "endcap_b", "back_promo"]

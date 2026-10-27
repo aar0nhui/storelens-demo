@@ -1,5 +1,5 @@
 # Example spec. On a real store: commit the gates BEFORE looking at results, then run
-#   glance fieldcheck --config store.yaml --db glance.db --spec fieldcheck.yaml
+#   storelens fieldcheck --config store.yaml --db storelens.db --spec fieldcheck.yaml
 runs: [1, 2]
 empty_runs: [3]   # replaced by scripts/run_fieldcheck_example.sh after processing the empty-store clip
 door_tally: door_tally.csv

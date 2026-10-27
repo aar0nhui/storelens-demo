@@ -6,7 +6,7 @@ __pycache__/
 weights/
 demo_out/
 
-# Raw simulated overhead video and ground truth are big and regenerable (`glance demo`). Never commit real footage.
+# Raw simulated overhead video and ground truth are big and regenerable (`storelens demo`). Never commit real footage.
 *.mp4
 *_gt.json.gz
 # ...except the small live-view clips the public demo needs

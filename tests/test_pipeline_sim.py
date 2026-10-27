@@ -9,12 +9,12 @@ import numpy as np
 import pytest
 import supervision as sv
 
-from glance.pipeline import Pipeline
-from glance.queries import Analytics, Window
-from glance.sim.generate import Period, generate_period
-from glance.sim.layout import build_store_config, default_layout
-from glance.store import EventStore
-from glance.validate import load_gt, validate
+from storelens.pipeline import Pipeline
+from storelens.queries import Analytics, Window
+from storelens.sim.generate import Period, generate_period
+from storelens.sim.layout import build_store_config, default_layout
+from storelens.store import EventStore
+from storelens.validate import load_gt, validate
 
 pytestmark = pytest.mark.slow
 START = 1_800_000_000.0
