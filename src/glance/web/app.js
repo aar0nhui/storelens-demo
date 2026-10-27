@@ -260,6 +260,9 @@
     const onSize = (w) => { if (Math.abs(w - lastW) < 1) return; lastW = w; clearTimeout(rt); rt = setTimeout(redraw, 100); };
     if ('ResizeObserver' in window) new ResizeObserver((es) => onSize(es[0].contentRect.width)).observe($('#panes'));
     else window.addEventListener('resize', () => onSize(window.innerWidth));
+    // Canvas labels are pixels, not text, so they do not reflow when a font arrives: with font-display: swap the
+    // floor plan would stay lettered in the fallback stack until something else redrew it.
+    if (document.fonts) document.fonts.ready.then(() => { markDirty(); paint(state.tab); });
 
     await load();
     initLive();

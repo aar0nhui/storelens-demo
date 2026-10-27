@@ -132,6 +132,9 @@ def test_dark_mode_toggle(client, chromium, tmp_path):  # noqa: F811
     try:
         page.goto(base + "/#/floor")
         page.wait_for_selector("#zoneTable tr.zrow")
+        # the canvas is redrawn when the bundled font lands, so take the baseline after that or it races the swap
+        page.wait_for_function("document.fonts.ready.then(() => true)")
+        page.wait_for_timeout(250)
         # nothing stored yet: no override, so the stylesheet follows the operating system (headless chromium = light)
         assert theme() is None
         light_bg, light_floor = bg(), page.evaluate("document.querySelector('canvas.floor').toDataURL()")
